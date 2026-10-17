@@ -19,7 +19,18 @@ Cholesterol is entered by hand from lab reports. All data stays on the phone.
 React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `expo-sqlite`
 (local storage, from step 2), `react-native-svg`.
 
-## Run it on your phone
+## Install the APK
+
+Every push to `main` (or the current feature branch) builds a standalone APK on GitHub Actions
+and publishes it under **Releases** as `MyHealth-<version>-build<N>.apk`.
+
+1. On your phone, open the repo's **Releases** page and download the latest `.apk`.
+2. Open it and allow "install unknown apps" for your browser when asked.
+3. Set up Health Connect (see *On the phone* below), then open MyHealth → **Allow access**.
+
+The APK is signed with the project's debug key, so new builds install over old ones.
+
+## Run it on your phone (development)
 
 Health Connect is a native module, so the app can't run in Expo Go — it needs a **development build**.
 

@@ -1,0 +1,73 @@
+name: Android APK
+
+# Builds a standalone, installable APK (JavaScript bundled in, no dev server needed)
+# and publishes it as a GitHub pre-release so it can be downloaded straight to a phone.
+on:
+  push:
+    branches: [main, claude/health-app-tracking-gw5k1n]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck and unit tests
+        run: |
+          npx tsc --noEmit
+          npx jest --ci
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Rename APK
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          cp android/app/build/outputs/apk/release/app-release.apk "MyHealth-${VERSION}-build${{ github.run_number }}.apk"
+          ls -l MyHealth-*.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyHealth-apk
+          path: MyHealth-*.apk
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="apk-build${{ github.run_number }}"
+          gh release create "$TAG" MyHealth-*.apk \
+            --target "${{ github.sha }}" \
+            --prerelease \
+            --title "MyHealth APK (build ${{ github.run_number }})" \
+            --notes "Built from ${{ github.ref_name }} at ${{ github.sha }}. Download the .apk on your Android phone and open it to install."
