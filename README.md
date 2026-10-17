@@ -1,3 +1,62 @@
 # MyHealth
 
 Personal Android health tracker: steps, weight, cholesterol and a weight-loss goal with a target date.
+
+Steps and weight are read from **Health Connect** (Google Fit and most watches/scales sync into it).
+Cholesterol is entered by hand from lab reports. All data stays on the phone.
+
+## Status
+
+| Roadmap step | Scope | State |
+|---|---|---|
+| 1. Foundation | Expo project, Health Connect access, Today screen with steps + latest weight | ✅ this branch |
+| 2. Weight & goal | Goal setup, trend/plan lines, ahead/behind | next |
+| 3. Steps & labs | Steps screen, cholesterol entry, full Today screen | |
+| 4. Polish | Reminders, CSV export, dark mode | |
+
+## Stack
+
+React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `expo-sqlite`
+(local storage, from step 2), `react-native-svg`.
+
+## Run it on your phone
+
+Health Connect is a native module, so the app can't run in Expo Go — it needs a **development build**.
+
+1. Install the tools once: `npm install`, then sign in to Expo with `npx eas-cli@latest login`
+   (free account at expo.dev).
+2. Build the development APK in the cloud (no Android Studio needed):
+
+   ```sh
+   npx eas-cli@latest build --profile development --platform android
+   ```
+
+   When it finishes, open the link on your phone and install the APK
+   (allow "install unknown apps" for your browser when asked).
+3. Start the dev server on your computer and open the app on the phone (same Wi-Fi):
+
+   ```sh
+   npm start
+   ```
+
+You only need to rebuild the APK when native dependencies or `app.json` change; JavaScript changes
+load live from `npm start`.
+
+For a standalone APK that runs without your computer: `npx eas-cli@latest build --profile preview --platform android`.
+
+### On the phone
+
+- Android 14+: Health Connect is built in (Settings → Security & privacy → Privacy → Health Connect).
+  Older Android: install **Health Connect** from the Play Store.
+- In **Google Fit** settings, turn on syncing with **Health Connect** so your steps and weight flow in.
+- Open MyHealth → **Allow access** and grant Steps and Weight.
+
+## Development
+
+```sh
+npm test          # unit tests (jest-expo)
+npm run typecheck # tsc --noEmit
+```
+
+Code lives in `src/`: routes in `src/app/` (Expo Router), Health Connect access in `src/health/`,
+pure helpers in `src/lib/`.
