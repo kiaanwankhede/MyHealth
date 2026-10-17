@@ -21,14 +21,14 @@ React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `e
 
 ## Install the APK
 
-Every push to `main` (or the current feature branch) builds a standalone APK on GitHub Actions
-and publishes it under **Releases** as `MyHealth-<version>-build<N>.apk`.
+Every push builds the APK on GitHub Actions and publishes it as the latest release.
 
-1. On your phone, open the repo's **Releases** page and download the latest `.apk`.
-2. Open it and allow "install unknown apps" for your browser when asked.
+1. On your phone, open **https://github.com/kiaanwankhede/MyHealth/releases/latest/download/myhealth.apk**
+   (or the repo's **Releases → latest**) and download `myhealth.apk`.
+2. Open it and allow installing from your browser/Files app.
 3. Set up Health Connect (see *On the phone* below), then open MyHealth → **Allow access**.
 
-The APK is signed with the project's debug key, so new builds install over old ones.
+Every build is signed with the same key, so a new APK installs over the old one and keeps your data.
 
 ## Run it on your phone (development)
 

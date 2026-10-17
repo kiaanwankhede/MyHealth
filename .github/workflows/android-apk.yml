@@ -1,17 +1,17 @@
-name: Android APK
+name: Build APK
 
-# Builds a standalone, installable APK (JavaScript bundled in, no dev server needed)
-# and publishes it as a GitHub pre-release so it can be downloaded straight to a phone.
+# Same flow as the Kharcha repo: build on every push, publish a release with a plain .apk
+# so the phone can always grab https://github.com/<owner>/<repo>/releases/latest/download/myhealth.apk
 on:
   push:
-    branches: [main, claude/health-app-tracking-gw5k1n]
+  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: android-apk-${{ github.ref }}
+  group: build-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -41,33 +41,38 @@ jobs:
           npx tsc --noEmit
           npx jest --ci
 
-      - name: Generate native Android project
+      # Expo generates the native Android project from app.json (it is not committed).
+      - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
         env:
           CI: 1
 
-      - name: Build release APK
+      # Release build: the JavaScript is bundled into the APK, so it runs without a dev server.
+      # Signed with the Expo template's debug key, which is the same on every build, so a new
+      # APK installs over the old one and keeps your data.
+      - name: Build the APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease --stacktrace
 
-      - name: Rename APK
-        run: |
-          VERSION=$(node -p "require('./app.json').expo.version")
-          cp android/app/build/outputs/apk/release/app-release.apk "MyHealth-${VERSION}-build${{ github.run_number }}.apk"
-          ls -l MyHealth-*.apk
+      - name: Name the APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk myhealth.apk
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: MyHealth build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: myhealth.apk
+          body: |
+            Install: download myhealth.apk below on your phone and open it.
+            Then in Google Fit settings turn on syncing with Health Connect, open MyHealth and tap Allow access.
+            Built from ${{ github.ref_name }} at ${{ github.sha }}.
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MyHealth-apk
-          path: MyHealth-*.apk
-
-      - name: Publish pre-release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="apk-build${{ github.run_number }}"
-          gh release create "$TAG" MyHealth-*.apk \
-            --target "${{ github.sha }}" \
-            --prerelease \
-            --title "MyHealth APK (build ${{ github.run_number }})" \
-            --notes "Built from ${{ github.ref_name }} at ${{ github.sha }}. Download the .apk on your Android phone and open it to install."
+          name: myhealth-apk
+          path: myhealth.apk
+          if-no-files-found: error
