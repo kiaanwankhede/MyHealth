@@ -1,7 +1,11 @@
-// Custom entry: register the home-screen widget's background handler, then start Expo Router.
+// Custom entry: start Expo Router, then register the home-screen widget's background handler.
+// The widget is optional: if its native part fails to load, the app must still open.
 import 'expo-router/entry';
-import { registerWidgetTaskHandler } from 'react-native-android-widget';
 
-import { widgetTaskHandler } from './src/widget/widgetTaskHandler';
-
-registerWidgetTaskHandler(widgetTaskHandler);
+try {
+  const { registerWidgetTaskHandler } = require('react-native-android-widget');
+  const { widgetTaskHandler } = require('./src/widget/widgetTaskHandler');
+  registerWidgetTaskHandler(widgetTaskHandler);
+} catch (e) {
+  console.warn('Home-screen widget unavailable', e);
+}

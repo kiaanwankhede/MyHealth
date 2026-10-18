@@ -6,14 +6,17 @@ import type { Goal } from '../lib/goal';
 
 export const DATABASE_NAME = 'sehat.db';
 
-/** Runs once per app start (SQLiteProvider onInit). Each step bumps PRAGMA user_version. */
+/**
+ * Runs once per app start (SQLiteProvider onInit), and by the home-screen widget, which opens the
+ * database on its own. Each step bumps PRAGMA user_version and tolerates tables that already exist.
+ */
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   const version = row?.user_version ?? 0;
 
   if (version < 1) {
     await db.execAsync(`
-      CREATE TABLE goals (
+      CREATE TABLE IF NOT EXISTS goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         start_date TEXT NOT NULL,
         start_kg REAL NOT NULL,
@@ -28,7 +31,7 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
   if (version < 2) {
     // All lipid values in mg/dL; any of them may be missing from a report.
     await db.execAsync(`
-      CREATE TABLE lab_reports (
+      CREATE TABLE IF NOT EXISTS lab_reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         date TEXT NOT NULL,
         lab TEXT,
@@ -45,7 +48,7 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
   if (version < 3) {
     // Small key/value store, e.g. the home-screen widget's last snapshot.
     await db.execAsync(`
-      CREATE TABLE kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
       PRAGMA user_version = 3;
     `);
   }
