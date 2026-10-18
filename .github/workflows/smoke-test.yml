@@ -1,0 +1,57 @@
+name: Smoke test APK
+
+# Installs a published sehat.apk on an Android emulator, opens it and records whether it
+# stays up, with the crash log and a screenshot. Change APK_TAG and push to test a build.
+on:
+  push:
+    paths:
+      - .github/workflows/smoke-test.yml
+  workflow_dispatch:
+
+env:
+  APK_TAG: build-10
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$APK_TAG" --repo "$GITHUB_REPOSITORY" --pattern sehat.apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          # x86_64 image; it runs the arm64-only APK through ARM translation.
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install -r sehat.apk
+            adb logcat -c
+            adb shell monkey -p com.kiaanwankhede.sehat -c android.intent.category.LAUNCHER 1
+            sleep 30
+            adb exec-out screencap -p > screen.png
+            (adb shell pidof com.kiaanwankhede.sehat && echo "RESULT: app is running") || echo "RESULT: app is NOT running"
+            adb logcat -d -b crash > crash.txt
+            adb logcat -d > logcat.txt
+            echo "===== crash buffer =====" && cat crash.txt
+            echo "===== errors =====" && grep -E " E |FATAL|AndroidRuntime|ReactNativeJS" logcat.txt | grep -v -E "emulator|goldfish|Gralloc" | tail -150
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-${{ env.APK_TAG }}
+          path: |
+            screen.png
+            crash.txt
+            logcat.txt

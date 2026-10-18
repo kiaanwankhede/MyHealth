@@ -4,6 +4,8 @@ name: Build APK
 # so the phone can always grab https://github.com/<owner>/<repo>/releases/latest/download/sehat.apk
 on:
   push:
+    paths-ignore:
+      - .github/workflows/smoke-test.yml
   pull_request:
   workflow_dispatch:
 
