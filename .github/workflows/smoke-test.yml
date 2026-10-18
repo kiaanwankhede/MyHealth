@@ -1,25 +1,46 @@
 name: Smoke test APK
 
-# Installs a published sehat.apk on an Android emulator, opens it and records whether it
-# stays up, with the crash log and a screenshot. Change APK_TAG and push to test a build.
+# Builds the same release APK as "Build APK", but for the emulator's x86_64 processor, installs it
+# on an Android emulator, opens it and records whether it stays up: crash log, JS errors, the text
+# on screen and a screenshot. Runs on every push, alongside the real build.
 on:
   push:
-    paths:
-      - .github/workflows/smoke-test.yml
   workflow_dispatch:
 
-env:
-  APK_TAG: build-12
+concurrency:
+  group: smoke-test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   launch:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
-      - name: Download APK
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release download "$APK_TAG" --repo "$GITHUB_REPOSITORY" --pattern sehat.apk
+          CI: 1
+
+      - name: Build the APK (x86_64, for the emulator)
+        working-directory: android
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --stacktrace
 
       - name: Enable KVM
         run: |
@@ -30,28 +51,30 @@ jobs:
       - name: Launch on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          # x86_64 image; it runs the arm64-only APK through ARM translation.
           api-level: 34
           target: google_apis
           arch: x86_64
           disable-animations: true
           script: |
-            adb install -r sehat.apk
+            adb install -r android/app/build/outputs/apk/release/app-release.apk
             adb logcat -c
             adb shell monkey -p com.kiaanwankhede.sehat -c android.intent.category.LAUNCHER 1
             sleep 30
             adb exec-out screencap -p > screen.png
             (adb shell pidof com.kiaanwankhede.sehat && echo "RESULT: app is running") || echo "RESULT: app is NOT running"
+            adb shell uiautomator dump /sdcard/ui.xml && adb pull /sdcard/ui.xml ui.xml
+            echo "===== text on screen =====" && (grep -o 'text="[^"]*"' ui.xml | grep -v 'text=""' | head -40 || true)
             adb logcat -d -b crash > crash.txt
             adb logcat -d > logcat.txt
             echo "===== crash buffer =====" && cat crash.txt
-            echo "===== errors =====" && grep -E " E |FATAL|AndroidRuntime|ReactNativeJS" logcat.txt | grep -v -E "emulator|goldfish|Gralloc" | tail -150
+            echo "===== app errors =====" && (grep -E "ReactNativeJS|AndroidRuntime|com.kiaanwankhede.sehat" logcat.txt | grep -E " E | W |FATAL" | tail -60 || true)
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smoke-test-${{ env.APK_TAG }}
+          name: smoke-test
           path: |
             screen.png
+            ui.xml
             crash.txt
             logcat.txt
