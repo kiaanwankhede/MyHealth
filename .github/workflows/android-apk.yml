@@ -50,9 +50,10 @@ jobs:
       # Release build: the JavaScript is bundled into the APK, so it runs without a dev server.
       # Signed with the Expo template's debug key, which is the same on every build, so a new
       # APK installs over the old one and keeps your data.
+      # 64-bit ARM only (every modern Android phone): cuts the native build roughly in four.
       - name: Build the APK
         working-directory: android
-        run: ./gradlew :app:assembleRelease --stacktrace
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --stacktrace
 
       - name: Name the APK
         run: cp android/app/build/outputs/apk/release/app-release.apk myhealth.apk
