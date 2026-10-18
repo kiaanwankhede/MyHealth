@@ -4,6 +4,7 @@ import {
   kcalFromSteps,
   retroGoal,
   stepStats,
+  yearInsights,
   type DailySteps,
 } from '../steps';
 
@@ -85,5 +86,39 @@ describe('estimates', () => {
     expect(distanceKm(7842)).toBeCloseTo(5.98, 2);
     expect(Math.round(kcalFromSteps(7842))).toBe(314);
     expect(Math.round(kcalFromSteps(7842, 84))).toBe(376);
+  });
+});
+
+describe('yearInsights', () => {
+  // Thu 1 Jan 2026 .. Sat 10 Jan 2026 (today), no data until 3 Jan.
+  const steps = [0, 0, 12000, 11000, 4000, 10000, 10000, 10000, 3000, 10500];
+  const days: DailySteps[] = steps.map((s, i) => ({ date: new Date(2026, 0, 1 + i), steps: s }));
+  const y = yearInsights(days, GOAL)!;
+
+  it('starts at the first day with data and leaves today out of averages', () => {
+    expect(y.from.getDate()).toBe(3);
+    expect(y.completedDays).toBe(7); // 3..9 Jan
+    expect(y.total).toBe(70500);
+    expect(y.average).toBe(8571); // 60,000 / 7
+  });
+
+  it('counts goal days, best day and streaks', () => {
+    expect(y.goalDays).toBe(5);
+    expect(y.goalRate).toBe(71);
+    expect(y.best.steps).toBe(12000);
+    expect(y.longestStreak).toEqual({ days: 3, end: new Date(2026, 0, 8) });
+    // Yesterday (9 Jan) missed, today met: 1.
+    expect(y.currentStreak).toBe(1);
+  });
+
+  it('averages by month and weekday', () => {
+    expect(y.monthly).toEqual([{ month: 0, average: 8571 }]);
+    // 3 Jan 2026 is a Saturday.
+    expect(y.weekdays[6]).toBe(12000);
+    expect(y.weekdays[5]).toBe(3000); // Fri 9 Jan
+  });
+
+  it('is null without any steps', () => {
+    expect(yearInsights([{ date: new Date(2026, 0, 1), steps: 0 }], GOAL)).toBeNull();
   });
 });

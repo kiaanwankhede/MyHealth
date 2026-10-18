@@ -77,5 +77,5 @@ local storage (SQLite: goals, lab reports) in `src/db/`, pure helpers in `src/li
 ### Retro step goal
 
 Once today's step goal is met, Sehat checks whether today and yesterday together reach 2 × the goal;
-if so, today plus the last two days against 3 × the goal, and so on, up to 30 days. It shows how many
+if so, today plus the last two days against 3 × the goal, and so on, as far back as 1 January. It shows how many
 days are covered and how many more steps would cover one more day.

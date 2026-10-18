@@ -77,3 +77,76 @@ export function describeRetro(r: RetroGoal): string {
       return `All of the last ${r.coveredDays} days covered.`;
   }
 }
+
+export type Streak = { days: number; end: Date | null };
+
+export type YearInsights = {
+  /** First day with any steps; earlier days are treated as "no data", not as zero. */
+  from: Date;
+  /** Completed days (today excluded) from `from`. Averages use these so a half-finished today doesn't drag them down. */
+  completedDays: number;
+  total: number;
+  average: number;
+  goalDays: number;
+  /** goalDays out of completed days, 0–100. */
+  goalRate: number;
+  best: DailySteps;
+  longestStreak: Streak;
+  /** Goal days in a row up to yesterday, plus today once its goal is met. */
+  currentStreak: number;
+  /** One entry per month that has data, in order. `month` is 0–11. */
+  monthly: { month: number; average: number }[];
+  /** Average steps by weekday, Sunday first; null where there are no completed days. */
+  weekdays: (number | null)[];
+  distanceKm: number;
+};
+
+/** `days` is oldest first and ends with today. Returns null if there are no steps at all. */
+export function yearInsights(days: readonly DailySteps[], goal: number): YearInsights | null {
+  const firstIdx = days.findIndex((d) => d.steps > 0);
+  if (firstIdx === -1) return null;
+  const range = days.slice(firstIdx);
+  const completed = range.slice(0, -1);
+  const today = range[range.length - 1];
+
+  const total = range.reduce((s, d) => s + d.steps, 0);
+  const completedTotal = completed.reduce((s, d) => s + d.steps, 0);
+  const goalDays = completed.filter((d) => d.steps >= goal).length;
+
+  let longest: Streak = { days: 0, end: null };
+  let run = 0;
+  for (const d of range) {
+    run = d.steps >= goal ? run + 1 : 0;
+    if (run > longest.days) longest = { days: run, end: d.date };
+  }
+
+  let current = 0;
+  for (let i = completed.length - 1; i >= 0 && completed[i].steps >= goal; i--) current++;
+  if (today.steps >= goal) current++;
+
+  const byMonth = new Map<number, { sum: number; n: number }>();
+  const byWeekday = Array.from({ length: 7 }, () => ({ sum: 0, n: 0 }));
+  for (const d of completed) {
+    const m = byMonth.get(d.date.getMonth()) ?? { sum: 0, n: 0 };
+    m.sum += d.steps;
+    m.n += 1;
+    byMonth.set(d.date.getMonth(), m);
+    byWeekday[d.date.getDay()].sum += d.steps;
+    byWeekday[d.date.getDay()].n += 1;
+  }
+
+  return {
+    from: range[0].date,
+    completedDays: completed.length,
+    total,
+    average: completed.length ? Math.round(completedTotal / completed.length) : today.steps,
+    goalDays,
+    goalRate: completed.length ? Math.round((goalDays / completed.length) * 100) : 0,
+    best: range.reduce((a, b) => (b.steps > a.steps ? b : a)),
+    longestStreak: longest,
+    currentStreak: current,
+    monthly: [...byMonth.entries()].map(([month, { sum, n }]) => ({ month, average: Math.round(sum / n) })),
+    weekdays: byWeekday.map(({ sum, n }) => (n ? Math.round(sum / n) : null)),
+    distanceKm: distanceKm(total),
+  };
+}

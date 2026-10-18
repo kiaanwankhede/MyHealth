@@ -5,19 +5,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectCard } from '../../components/ConnectCard';
 import { RetroGoalCard } from '../../components/RetroGoalCard';
 import { StepsBarChart } from '../../components/StepsBarChart';
+import { YearInsights } from '../../components/YearInsights';
 import { DAILY_STEP_GOAL } from '../../config';
 import { requestHealthConnectAccess } from '../../health/healthConnect';
 import { useSteps } from '../../health/useSteps';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayMonth } from '../../lib/dates';
 import { formatCount } from '../../lib/format';
-import { distanceKm, kcalFromSteps, retroGoal, stepStats } from '../../lib/steps';
+import { distanceKm, kcalFromSteps, retroGoal, stepStats, yearInsights } from '../../lib/steps';
 import { colors, radius } from '../../theme';
 
 type Range = 7 | 30;
 
 export default function StepsScreen() {
-  const { status, days, error, reload } = useSteps();
+  const { status, days, fullAccess, error, reload } = useSteps();
   const { latest } = useWeightGoal();
   const [range, setRange] = useState<Range>(7);
 
@@ -26,6 +27,7 @@ export default function StepsScreen() {
   const stats = stepStats(shown, DAILY_STEP_GOAL);
   const retro = retroGoal([...days].reverse().map((d) => d.steps), DAILY_STEP_GOAL);
   const toGo = Math.max(0, DAILY_STEP_GOAL - today);
+  const year = yearInsights(days, DAILY_STEP_GOAL);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -60,6 +62,20 @@ export default function StepsScreen() {
 
             <RetroGoalCard retro={retro} />
 
+            {!fullAccess && (
+              <Pressable
+                style={styles.access}
+                onPress={async () => {
+                  await requestHealthConnectAccess();
+                  await reload();
+                }}
+                accessibilityRole="button"
+              >
+                <Text style={styles.accessText}>Allow past-data access to include all your steps since 1 January.</Text>
+                <Text style={styles.link}>Allow access</Text>
+              </Pressable>
+            )}
+
             <View style={styles.toggle}>
               {([7, 30] as const).map((r) => (
                 <Pressable
@@ -91,6 +107,15 @@ export default function StepsScreen() {
               <Row label="Burned from steps" value={`≈ ${formatCount(kcalFromSteps(today, latest?.trend))} kcal`} />
             </View>
             <Text style={styles.note}>Distance and calories are estimates from your step count.</Text>
+
+            {year && (
+              <YearInsights
+                insights={year}
+                goal={DAILY_STEP_GOAL}
+                year={new Date().getFullYear()}
+                fullAccess={fullAccess}
+              />
+            )}
           </>
         )}
       </ScrollView>
@@ -131,4 +156,7 @@ const styles = StyleSheet.create({
   },
   value: { fontSize: 16, fontWeight: '600', color: colors.ink },
   note: { fontSize: 13, color: colors.muted },
+  access: { backgroundColor: colors.orangeSoft, borderRadius: radius.pill, padding: 14, gap: 6 },
+  accessText: { fontSize: 15, lineHeight: 21, color: '#8A3A0E' },
+  link: { fontSize: 15, fontWeight: '700', color: colors.teal },
 });
