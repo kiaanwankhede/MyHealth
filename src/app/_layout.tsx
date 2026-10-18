@@ -32,6 +32,7 @@ export default function RootLayout() {
           <Stack.Screen name="medicine" options={{ title: 'Medicine', presentation: 'modal' }} />
           <Stack.Screen name="reminders" options={{ title: 'Reminders' }} />
           <Stack.Screen name="summary" options={{ title: 'Doctor summary', presentation: 'modal' }} />
+          <Stack.Screen name="import-report" options={{ title: 'Import lab report', presentation: 'modal' }} />
         </Stack>
       </ProfileProvider>
     </SQLiteProvider>

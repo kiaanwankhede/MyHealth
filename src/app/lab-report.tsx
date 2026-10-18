@@ -6,8 +6,9 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 
 import { DateField, NumberField, TextField } from '../components/FormFields';
 import { deleteLabReport, getLabReport, saveLabReport } from '../db/database';
-import { startOfLocalDay } from '../lib/dates';
+import { fromISODate, startOfLocalDay } from '../lib/dates';
 import { parseDecimal } from '../lib/format';
+import type { Prefill } from '../lib/labImport';
 import {
   GROUPS,
   TESTS,
@@ -41,8 +42,9 @@ function toValues(texts: Texts): LabValues {
 
 export default function LabReportScreen() {
   const db = useSQLiteContext();
-  const { id: idParam } = useLocalSearchParams<{ id?: string }>();
+  const { id: idParam, prefill: prefillParam } = useLocalSearchParams<{ id?: string; prefill?: string }>();
   const id = idParam ? Number(idParam) : null;
+  const [notes, setNotes] = useState<string[] | null>(null);
   const today = startOfLocalDay(new Date());
 
   const [date, setDate] = useState(today);
@@ -51,6 +53,17 @@ export default function LabReportScreen() {
   const [open, setOpen] = useState<Set<GroupKey>>(new Set(['lipids']));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Values read from an imported report, for the user to check.
+  useEffect(() => {
+    if (!prefillParam) return;
+    const p = JSON.parse(prefillParam) as Prefill;
+    if (p.date) setDate(fromISODate(p.date));
+    if (p.lab) setLab(p.lab);
+    setTexts(Object.fromEntries(Object.entries(p.values).map(([k, v]) => [k, String(v)])));
+    setOpen(new Set(TESTS.filter((t) => p.values[t.key] !== undefined).map((t) => t.group)));
+    setNotes(p.notes);
+  }, [prefillParam]);
 
   useEffect(() => {
     if (id === null) return;
@@ -102,6 +115,19 @@ export default function LabReportScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <Stack.Screen options={{ title: id === null ? 'Add lab report' : 'Edit lab report' }} />
+      {notes && (
+        <View style={styles.imported}>
+          <Text style={styles.importedTitle}>Read from your report</Text>
+          <Text style={styles.importedText}>
+            Check every value and the date against the report before saving. Add anything that was missed.
+          </Text>
+          {notes.map((n) => (
+            <Text key={n} style={styles.importedText}>
+              • {n}
+            </Text>
+          ))}
+        </View>
+      )}
       <DateField label="Test date" value={date} onChange={setDate} maximumDate={today} />
       <TextField label="Lab (optional)" value={lab} onChangeText={setLab} placeholder="e.g. Thyrocare" />
       <Text style={styles.note}>Fill in only what’s on your report; leave the rest empty.</Text>
@@ -174,6 +200,9 @@ const styles = StyleSheet.create({
   },
   addGroupText: { fontSize: 16, fontWeight: '600', color: colors.teal },
   error: { fontSize: 15, color: colors.orangeDark },
+  imported: { backgroundColor: colors.tealSoft, borderRadius: radius.pill, padding: 14, gap: 4 },
+  importedTitle: { fontSize: 16, fontWeight: '700', color: colors.ink },
+  importedText: { fontSize: 14, lineHeight: 20, color: colors.tealDark },
   button: {
     backgroundColor: colors.teal,
     borderRadius: radius.pill,

@@ -1,0 +1,7 @@
+{
+  "name": "sehat-pdf",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.ts",
+  "description": "Renders PDF pages to images and reads text from images on the phone (Android PdfRenderer + ML Kit)."
+}

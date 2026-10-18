@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.sehatpdf'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.sehatpdf"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // On-device text recognition with the Latin model bundled in the APK (no download, works offline).
+  implementation 'com.google.mlkit:text-recognition:16.0.1'
+}
