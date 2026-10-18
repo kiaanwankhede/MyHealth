@@ -24,7 +24,8 @@
         "android.permission.health.WRITE_WEIGHT",
         "android.permission.health.READ_HEALTH_DATA_HISTORY",
         "android.permission.health.READ_SLEEP",
-        "android.permission.health.READ_RESTING_HEART_RATE"
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -35,13 +36,33 @@
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 26
+            "minSdkVersion": 26,
+            "extraProguardRules": "# WorkManager (used by the home-screen widget) creates its Room database by reflection.\n-keep class * extends androidx.room.RoomDatabase { <init>(); }\n-keep class androidx.work.impl.WorkDatabase_Impl { *; }\n"
           }
         }
       ],
       "expo-sqlite",
       "@react-native-community/datetimepicker",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Sehat",
+              "label": "Sehat – steps today",
+              "description": "Today's steps, retro goal and weight trend",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      "./plugins/with-work-manager"
     ]
   }
 }

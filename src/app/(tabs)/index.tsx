@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -32,6 +32,8 @@ import { classify, latest, type LabContext } from '../../lib/labs';
 import { ageOn } from '../../lib/profile';
 import { detectPlateau, weeklyReview } from '../../lib/review';
 import { syncReminders } from '../../notifications/reminders';
+import { buildSnapshot } from '../../widget/snapshot';
+import { updateWidget } from '../../widget/updateWidget';
 import { describeRetro, retroGoal } from '../../lib/steps';
 import { colors, radius, toneColors } from '../../theme';
 
@@ -60,8 +62,35 @@ export default function TodayScreen() {
   const retro = retroGoal(newestFirst, stepGoal);
   const latestLdl = reports ? latest(reports, 'ldl') : null;
   const labCtx: LabContext = { heartRisk: profile.heartRisk, sex: profile.sex, age: ageOn(profile, now) };
-  const review = weeklyReview({ series: weightGoal.series, steps: stepHistory.days, stepGoal, reports: reports ?? [], now });
-  const plateau = weightGoal.progress && !weightGoal.progress.reached && detectPlateau(weightGoal.series, now);
+  const review = weeklyReview({
+    series: weightGoal.series,
+    steps: stepHistory.days,
+    stepGoal,
+    reports: reports ?? [],
+    now,
+  });
+  const plateau =
+    weightGoal.progress && !weightGoal.progress.reached && detectPlateau(weightGoal.series, now);
+
+  // Keep the home-screen widget in step with what this screen shows.
+  const trendKg = weightGoal.latest?.trend ?? null;
+  const widgetKey = `${steps}|${stepGoal}|${retro.state}|${trendKg}|${weightGoal.progress?.percent}|${weightGoal.progress?.behindKg}`;
+  useEffect(() => {
+    if (status !== 'ready' || steps === null) return;
+    updateWidget(
+      db,
+      buildSnapshot({
+        steps,
+        goal: stepGoal,
+        retro,
+        trendKg,
+        progress: weightGoal.progress,
+        now: new Date(),
+      }),
+    ).catch(() => {});
+    // widgetKey captures every value the widget shows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, status, widgetKey]);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -93,9 +122,7 @@ export default function TodayScreen() {
           </View>
         )}
 
-        {status !== 'loading' && status !== 'ready' && (
-          <ConnectCard status={status} onConnect={connect} />
-        )}
+        {status !== 'loading' && status !== 'ready' && <ConnectCard status={status} onConnect={connect} />}
 
         {status === 'ready' && (
           <>

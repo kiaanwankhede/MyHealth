@@ -1,4 +1,8 @@
-import type { Permission, ReadHealthDataHistoryPermission } from 'react-native-health-connect';
+import type {
+  BackgroundAccessPermission,
+  Permission,
+  ReadHealthDataHistoryPermission,
+} from 'react-native-health-connect';
 
 /** Steps, weight and their history: the "Allow access" prompts on Steps and Weight are about these. */
 export const CORE_PERMISSIONS: (Permission | ReadHealthDataHistoryPermission)[] = [
@@ -16,8 +20,13 @@ export const WATCH_PERMISSIONS: Permission[] = [
   { accessType: 'read', recordType: 'RestingHeartRate' },
 ];
 
+/** Lets the home-screen widget refresh steps while the app is closed. Optional. */
+export const BACKGROUND_PERMISSIONS: BackgroundAccessPermission[] = [
+  { accessType: 'read', recordType: 'BackgroundAccessPermission' },
+];
+
 /** Everything the app asks Health Connect for. Must match android.permissions in app.json. */
-export const REQUESTED_PERMISSIONS = [...CORE_PERMISSIONS, ...WATCH_PERMISSIONS];
+export const REQUESTED_PERMISSIONS = [...CORE_PERMISSIONS, ...WATCH_PERMISSIONS, ...BACKGROUND_PERMISSIONS];
 
 /**
  * The app can't work without these. Write access (logging a weigh-in) and past-data access

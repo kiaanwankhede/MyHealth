@@ -1,9 +1,11 @@
 # Sehat (सेहत)
 
-Personal Android health tracker: steps, weight, cholesterol and a weight-loss goal with a target date.
+Personal Android health tracker for Indian adults: steps, weight with a dated weight-loss goal, body
+measures with Asian cut-offs, lab results, sleep, medicines. No calorie counting, no account, no ads.
 
-Steps and weight are read from **Health Connect** (Google Fit and most watches/scales sync into it).
-Cholesterol is entered by hand from lab reports. All data stays on the phone.
+Steps, weight, sleep and resting heart rate are read from **Health Connect** (Google Fit and most
+watches/scales sync into it). Lab reports are typed in or imported from a PDF/photo, read on the phone.
+All data stays on the phone.
 
 ## Status
 
@@ -12,12 +14,18 @@ Cholesterol is entered by hand from lab reports. All data stays on the phone.
 | 1. Foundation | Expo project, Health Connect access, Today screen with steps + latest weight | ✅ |
 | 2. Weight & goal | Goal setup, trend/plan lines, ahead/behind, log a weigh-in | ✅ |
 | 3. Steps & labs | Steps screen with retro goal, cholesterol lab reports, full Today screen | ✅ |
-| 4. Polish | Settings (step goal, height), reminders, CSV export, dark mode | next |
+| 4. Indian health focus | Profile; Asian BMI and waist; HbA1c, BP, thyroid, vitamins, kidney, Lp(a); LAI LDL targets; last-7-days review; plateau alert | ✅ |
+| 5. Safety net | Backup/restore and CSV export; reminders; medicines; doctor summary PDF | ✅ |
+| 6. Less typing | Lab report import (PDF/photo, on-device OCR); sleep and resting heart rate; home-screen widget | ✅ |
 
 ## Stack
 
-React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `expo-sqlite`
-(local storage, from step 2), `react-native-svg`.
+React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `expo-sqlite`,
+`react-native-svg`, `expo-notifications`, `expo-print`, `react-native-android-widget`, and a small local
+native module (`modules/sehat-pdf`: Android PdfRenderer + ML Kit text recognition, bundled model).
+
+Every push also runs **Smoke test APK**: an x86_64 copy of the release build is installed on an Android
+emulator and opened, and the log shows whether it stays up, any crash, and the text on screen.
 
 ## Install the APK
 
@@ -73,6 +81,24 @@ Code lives in `src/`: routes in `src/app/` (Expo Router), Health Connect access 
 local storage (SQLite: goals, lab reports) in `src/db/`, pure helpers in `src/lib/`. All weight-goal maths is in
 `src/lib/goal.ts`, step maths (including the retro goal) in `src/lib/steps.ts` and cholesterol ranges in
 `src/lib/cholesterol.ts`, each covered by tests in `src/lib/__tests__/`.
+
+### Home-screen widget
+
+Long-press the home screen → Widgets → **Sehat** (4×2, resizable). It shows today's steps with a
+progress bar, the retro-goal line and, when wide enough, the weight trend and goal status. It
+updates whenever the app is opened and every 30 minutes in the background (steps only, if Health
+Connect background access is allowed). Tap it to open Sehat.
+
+The widget library uses WorkManager; `plugins/with-work-manager.js` makes the app use a current
+WorkManager and `app.json` keeps Room's generated database classes from R8, which fixed the
+launch crash in builds 9–10.
+
+### Lab report import
+
+Labs → Import → pick the report PDF or a photo. Pages are rendered at 3× and read with ML Kit on
+the phone (nothing is uploaded); `src/lib/labImport.ts` rebuilds table rows from line positions,
+matches Indian labs' test names, converts units and finds the collection date. The values open in
+the lab form to check before saving.
 
 ### Retro step goal
 
