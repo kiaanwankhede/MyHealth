@@ -6,7 +6,7 @@ import { ConnectCard } from '../../components/ConnectCard';
 import { RetroGoalCard } from '../../components/RetroGoalCard';
 import { StepsBarChart } from '../../components/StepsBarChart';
 import { YearInsights } from '../../components/YearInsights';
-import { DAILY_STEP_GOAL } from '../../config';
+import { useProfile } from '../../db/profile';
 import { requestHealthConnectAccess } from '../../health/healthConnect';
 import { useSteps } from '../../health/useSteps';
 import { useWeightGoal } from '../../health/useWeightGoal';
@@ -21,13 +21,14 @@ export default function StepsScreen() {
   const { status, days, fullAccess, error, reload } = useSteps();
   const { latest } = useWeightGoal();
   const [range, setRange] = useState<Range>(7);
+  const { stepGoal } = useProfile().profile;
 
   const today = days.length ? days[days.length - 1].steps : 0;
   const shown = days.slice(-range);
-  const stats = stepStats(shown, DAILY_STEP_GOAL);
-  const retro = retroGoal([...days].reverse().map((d) => d.steps), DAILY_STEP_GOAL);
-  const toGo = Math.max(0, DAILY_STEP_GOAL - today);
-  const year = yearInsights(days, DAILY_STEP_GOAL);
+  const stats = stepStats(shown, stepGoal);
+  const retro = retroGoal([...days].reverse().map((d) => d.steps), stepGoal);
+  const toGo = Math.max(0, stepGoal - today);
+  const year = yearInsights(days, stepGoal);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -56,7 +57,7 @@ export default function StepsScreen() {
               <Text style={styles.muted}>today</Text>
             </View>
             <Text style={styles.goalLine}>
-              Goal {formatCount(DAILY_STEP_GOAL)} ·{' '}
+              Goal {formatCount(stepGoal)} ·{' '}
               {toGo > 0 ? `${formatCount(toGo)} to go` : 'done for today'}
             </Text>
 
@@ -92,7 +93,7 @@ export default function StepsScreen() {
               ))}
             </View>
 
-            <StepsBarChart days={shown} goal={DAILY_STEP_GOAL} />
+            <StepsBarChart days={shown} goal={stepGoal} />
 
             <View style={styles.list}>
               <Row label={`${range}-day average`} value={formatCount(stats.average)} />
@@ -111,7 +112,7 @@ export default function StepsScreen() {
             {year && (
               <YearInsights
                 insights={year}
-                goal={DAILY_STEP_GOAL}
+                goal={stepGoal}
                 year={new Date().getFullYear()}
                 fullAccess={fullAccess}
               />

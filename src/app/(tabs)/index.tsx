@@ -11,16 +11,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectCard } from '../../components/ConnectCard';
+import { PlateauCard } from '../../components/PlateauCard';
 import { StepsRing } from '../../components/StepsRing';
-import { DAILY_STEP_GOAL } from '../../config';
+import { WeeklyCard } from '../../components/WeeklyCard';
+import { useProfile } from '../../db/profile';
 import { useLabReports } from '../../health/useLabReports';
 import { useSteps } from '../../health/useSteps';
 import { useTodayHealth } from '../../health/useTodayHealth';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayHeading, formatDayMonth, formatRelativeDay, greetingFor } from '../../lib/dates';
 import { formatCount, formatKg, percentOfGoal } from '../../lib/format';
-import { classify } from '../../lib/cholesterol';
 import { describeStatus } from '../../lib/goal';
+import { classify, latest, type LabContext } from '../../lib/labs';
+import { ageOn } from '../../lib/profile';
+import { detectPlateau, weeklyReview } from '../../lib/review';
 import { describeRetro, retroGoal } from '../../lib/steps';
 import { colors, radius, toneColors } from '../../theme';
 
@@ -29,13 +33,18 @@ export default function TodayScreen() {
   const weightGoal = useWeightGoal();
   const stepHistory = useSteps();
   const { reports } = useLabReports();
+  const { profile } = useProfile();
+  const stepGoal = profile.stepGoal;
   const now = new Date();
-  const stepsPercent = percentOfGoal(steps ?? 0, DAILY_STEP_GOAL);
+  const stepsPercent = percentOfGoal(steps ?? 0, stepGoal);
   // History newest first, with today's live count in front.
   const newestFirst = stepHistory.days.map((d) => d.steps).reverse();
   if (steps !== null) newestFirst[0] = steps;
-  const retro = retroGoal(newestFirst, DAILY_STEP_GOAL);
-  const latestLdl = reports?.find((r) => r.ldl !== null);
+  const retro = retroGoal(newestFirst, stepGoal);
+  const latestLdl = reports ? latest(reports, 'ldl') : null;
+  const labCtx: LabContext = { heartRisk: profile.heartRisk, sex: profile.sex, age: ageOn(profile, now) };
+  const review = weeklyReview({ series: weightGoal.series, steps: stepHistory.days, stepGoal, reports: reports ?? [], now });
+  const plateau = weightGoal.progress && !weightGoal.progress.reached && detectPlateau(weightGoal.series, now);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -81,7 +90,7 @@ export default function TodayScreen() {
                 <StepsRing percent={stepsPercent} />
                 <View>
                   <Text style={styles.bigNumber}>{formatCount(steps ?? 0)}</Text>
-                  <Text style={styles.muted}>of {formatCount(DAILY_STEP_GOAL)} steps</Text>
+                  <Text style={styles.muted}>of {formatCount(stepGoal)} steps</Text>
                   <Text style={styles.stepsPercent}>{stepsPercent}% of goal</Text>
                 </View>
               </View>
@@ -107,6 +116,7 @@ export default function TodayScreen() {
             </Pressable>
 
             <GoalCard {...weightGoal} />
+            {plateau && <PlateauCard />}
 
             <Pressable
               style={[styles.card, styles.rowBetween]}
@@ -116,13 +126,15 @@ export default function TodayScreen() {
               <View>
                 <Text style={styles.muted}>LDL cholesterol</Text>
                 {latestLdl ? (
-                  <LdlStatus ldl={latestLdl.ldl!} date={latestLdl.date} />
+                  <LdlStatus ldl={latestLdl.value} date={latestLdl.date} ctx={labCtx} />
                 ) : (
                   <Text style={styles.trend}>Add a lab report</Text>
                 )}
               </View>
-              <Text style={styles.value}>{latestLdl ? `${formatCount(latestLdl.ldl!)} mg/dL` : '–'}</Text>
+              <Text style={styles.value}>{latestLdl ? `${formatCount(latestLdl.value)} mg/dL` : '–'}</Text>
             </Pressable>
+
+            <WeeklyCard review={review} stepGoal={stepGoal} />
           </>
         )}
       </ScrollView>
@@ -130,8 +142,8 @@ export default function TodayScreen() {
   );
 }
 
-function LdlStatus({ ldl, date }: { ldl: number; date: Date }) {
-  const c = classify('ldl', ldl);
+function LdlStatus({ ldl, date, ctx }: { ldl: number; date: Date; ctx: LabContext }) {
+  const c = classify('ldl', ldl, ctx)!;
   return (
     <Text style={[styles.ldlStatus, { color: toneColors[c.tone] }]}>
       {c.label} · {formatDayMonth(date)}

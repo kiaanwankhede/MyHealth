@@ -1,8 +1,11 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { fromISODate, toISODate } from '../lib/dates';
-import type { LabReport } from '../lib/cholesterol';
+import type { BackupData } from '../lib/backup';
+import type { WaistEntry } from '../lib/body';
 import type { Goal } from '../lib/goal';
+import type { LabReport, LabValues, TestKey } from '../lib/labs';
+import { parseProfile, type Profile } from '../lib/profile';
 
 export const DATABASE_NAME = 'sehat.db';
 
@@ -52,6 +55,31 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
       PRAGMA user_version = 3;
     `);
   }
+
+  if (version < 4) {
+    // Lab reports hold any number of tests, one row per value. The lipid columns on
+    // lab_reports are copied over and no longer read.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS lab_values (
+        report_id INTEGER NOT NULL,
+        test TEXT NOT NULL,
+        value REAL NOT NULL,
+        PRIMARY KEY (report_id, test)
+      );
+      INSERT OR IGNORE INTO lab_values SELECT id, 'total', total FROM lab_reports WHERE total IS NOT NULL;
+      INSERT OR IGNORE INTO lab_values SELECT id, 'ldl', ldl FROM lab_reports WHERE ldl IS NOT NULL;
+      INSERT OR IGNORE INTO lab_values SELECT id, 'hdl', hdl FROM lab_reports WHERE hdl IS NOT NULL;
+      INSERT OR IGNORE INTO lab_values
+        SELECT id, 'triglycerides', triglycerides FROM lab_reports WHERE triglycerides IS NOT NULL;
+      CREATE TABLE IF NOT EXISTS waist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        cm REAL NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      PRAGMA user_version = 4;
+    `);
+  }
 }
 
 export async function getValue(db: SQLiteDatabase, key: string): Promise<string | null> {
@@ -90,59 +118,152 @@ export async function saveGoal(db: SQLiteDatabase, goal: Goal): Promise<void> {
   );
 }
 
-type LabReportRow = {
-  id: number;
-  date: string;
-  lab: string | null;
-  total: number | null;
-  ldl: number | null;
-  hdl: number | null;
-  triglycerides: number | null;
-};
+type LabRow = { id: number; date: string; lab: string | null };
+type ValueRow = { report_id: number; test: string; value: number };
 
-const fromRow = (r: LabReportRow): LabReport => ({ ...r, date: fromISODate(r.date) });
+async function withValues(db: SQLiteDatabase, rows: LabRow[]): Promise<LabReport[]> {
+  if (rows.length === 0) return [];
+  const values = await db.getAllAsync<ValueRow>(
+    `SELECT report_id, test, value FROM lab_values WHERE report_id IN (${rows.map(() => '?').join(',')})`,
+    ...rows.map((r) => r.id),
+  );
+  const byReport = new Map<number, LabValues>();
+  for (const v of values) {
+    const entry = byReport.get(v.report_id) ?? {};
+    entry[v.test as TestKey] = v.value;
+    byReport.set(v.report_id, entry);
+  }
+  return rows.map((r) => ({ id: r.id, date: fromISODate(r.date), lab: r.lab, values: byReport.get(r.id) ?? {} }));
+}
 
 /** Newest first. */
 export async function listLabReports(db: SQLiteDatabase): Promise<LabReport[]> {
-  const rows = await db.getAllAsync<LabReportRow>(
-    'SELECT id, date, lab, total, ldl, hdl, triglycerides FROM lab_reports ORDER BY date DESC, id DESC',
-  );
-  return rows.map(fromRow);
+  const rows = await db.getAllAsync<LabRow>('SELECT id, date, lab FROM lab_reports ORDER BY date DESC, id DESC');
+  return withValues(db, rows);
 }
 
 export async function getLabReport(db: SQLiteDatabase, id: number): Promise<LabReport | null> {
-  const row = await db.getFirstAsync<LabReportRow>(
-    'SELECT id, date, lab, total, ldl, hdl, triglycerides FROM lab_reports WHERE id = ?',
-    id,
-  );
-  return row ? fromRow(row) : null;
+  const row = await db.getFirstAsync<LabRow>('SELECT id, date, lab FROM lab_reports WHERE id = ?', id);
+  return row ? (await withValues(db, [row]))[0] : null;
 }
 
-/** Inserts when `id` is null, otherwise updates that report. */
+/** Inserts when `id` is null, otherwise replaces that report's date, lab and values. */
 export async function saveLabReport(db: SQLiteDatabase, report: Omit<LabReport, 'id'> & { id: number | null }) {
-  const values = [
-    toISODate(report.date),
-    report.lab,
-    report.total,
-    report.ldl,
-    report.hdl,
-    report.triglycerides,
-  ] as const;
-  if (report.id === null) {
-    await db.runAsync(
-      'INSERT INTO lab_reports (date, lab, total, ldl, hdl, triglycerides, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      ...values,
-      new Date().toISOString(),
-    );
-  } else {
-    await db.runAsync(
-      'UPDATE lab_reports SET date = ?, lab = ?, total = ?, ldl = ?, hdl = ?, triglycerides = ? WHERE id = ?',
-      ...values,
-      report.id,
-    );
-  }
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    let id = report.id;
+    if (id === null) {
+      const result = await tx.runAsync(
+        'INSERT INTO lab_reports (date, lab, created_at) VALUES (?, ?, ?)',
+        toISODate(report.date),
+        report.lab,
+        new Date().toISOString(),
+      );
+      id = result.lastInsertRowId;
+    } else {
+      await tx.runAsync('UPDATE lab_reports SET date = ?, lab = ? WHERE id = ?', toISODate(report.date), report.lab, id);
+      await tx.runAsync('DELETE FROM lab_values WHERE report_id = ?', id);
+    }
+    for (const [test, value] of Object.entries(report.values)) {
+      if (value !== undefined) {
+        await tx.runAsync('INSERT INTO lab_values (report_id, test, value) VALUES (?, ?, ?)', id, test, value);
+      }
+    }
+  });
 }
 
 export async function deleteLabReport(db: SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM lab_reports WHERE id = ?', id);
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync('DELETE FROM lab_values WHERE report_id = ?', id);
+    await tx.runAsync('DELETE FROM lab_reports WHERE id = ?', id);
+  });
+}
+
+type WaistRow = { id: number; date: string; cm: number };
+
+/** Newest first. */
+export async function listWaist(db: SQLiteDatabase): Promise<WaistEntry[]> {
+  const rows = await db.getAllAsync<WaistRow>('SELECT id, date, cm FROM waist ORDER BY date DESC, id DESC');
+  return rows.map((r) => ({ id: r.id, date: fromISODate(r.date), cm: r.cm }));
+}
+
+export async function addWaist(db: SQLiteDatabase, date: Date, cm: number): Promise<void> {
+  await db.runAsync(
+    'INSERT INTO waist (date, cm, created_at) VALUES (?, ?, ?)',
+    toISODate(date),
+    cm,
+    new Date().toISOString(),
+  );
+}
+
+export async function deleteWaist(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM waist WHERE id = ?', id);
+}
+
+const PROFILE_KEY = 'profile';
+
+export async function getProfile(db: SQLiteDatabase): Promise<Profile> {
+  return parseProfile(await getValue(db, PROFILE_KEY));
+}
+
+export async function saveProfile(db: SQLiteDatabase, profile: Profile): Promise<void> {
+  await setValue(db, PROFILE_KEY, JSON.stringify(profile));
+}
+
+/** Everything Sehat stores itself, for a backup file. */
+export async function readBackupData(db: SQLiteDatabase): Promise<BackupData> {
+  const goals = await db.getAllAsync<GoalRow & { created_at: string }>(
+    'SELECT start_date, start_kg, target_kg, target_date, created_at FROM goals ORDER BY id',
+  );
+  const settings = await db.getAllAsync<{ key: string; value: string }>('SELECT key, value FROM kv');
+  return {
+    goals: goals.map((g) => ({
+      startDate: fromISODate(g.start_date),
+      startKg: g.start_kg,
+      targetKg: g.target_kg,
+      targetDate: fromISODate(g.target_date),
+      createdAt: g.created_at,
+    })),
+    labReports: await listLabReports(db),
+    waist: await listWaist(db),
+    settings: Object.fromEntries(settings.map((s) => [s.key, s.value])),
+  };
+}
+
+/** Replaces everything Sehat stores with the backup's contents, all or nothing. */
+export async function restoreBackupData(db: SQLiteDatabase, data: BackupData): Promise<void> {
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.execAsync('DELETE FROM goals; DELETE FROM lab_values; DELETE FROM lab_reports; DELETE FROM waist; DELETE FROM kv;');
+    for (const g of data.goals) {
+      await tx.runAsync(
+        'INSERT INTO goals (start_date, start_kg, target_kg, target_date, created_at) VALUES (?, ?, ?, ?, ?)',
+        toISODate(g.startDate),
+        g.startKg,
+        g.targetKg,
+        toISODate(g.targetDate),
+        g.createdAt,
+      );
+    }
+    for (const r of data.labReports) {
+      const { lastInsertRowId: id } = await tx.runAsync(
+        'INSERT INTO lab_reports (date, lab, created_at) VALUES (?, ?, ?)',
+        toISODate(r.date),
+        r.lab,
+        new Date().toISOString(),
+      );
+      for (const [test, value] of Object.entries(r.values)) {
+        await tx.runAsync('INSERT INTO lab_values (report_id, test, value) VALUES (?, ?, ?)', id, test, value);
+      }
+    }
+    for (const w of data.waist) {
+      await tx.runAsync(
+        'INSERT INTO waist (date, cm, created_at) VALUES (?, ?, ?)',
+        toISODate(w.date),
+        w.cm,
+        new Date().toISOString(),
+      );
+    }
+    for (const [key, value] of Object.entries(data.settings)) {
+      await tx.runAsync('INSERT INTO kv (key, value) VALUES (?, ?)', key, value);
+    }
+  });
 }

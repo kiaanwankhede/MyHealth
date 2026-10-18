@@ -2,20 +2,41 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DateField, NumberField, TextField } from '../components/FormFields';
 import { deleteLabReport, getLabReport, saveLabReport } from '../db/database';
-import { LIPIDS, validateLipid, type LipidKey } from '../lib/cholesterol';
 import { startOfLocalDay } from '../lib/dates';
 import { parseDecimal } from '../lib/format';
+import {
+  GROUPS,
+  TESTS,
+  testsIn,
+  validateReport,
+  type GroupKey,
+  type LabValues,
+  type TestKey,
+} from '../lib/labs';
 import { colors, radius } from '../theme';
 
-type Values = Record<LipidKey, string>;
-const EMPTY: Values = { total: '', ldl: '', hdl: '', triglycerides: '' };
+type Texts = Partial<Record<TestKey, string>>;
+
+const GROUP_NOTES: Partial<Record<GroupKey, string>> = {
+  lipids: 'Lp(a) is usually tested once in a lifetime. If your report shows nmol/L, divide by 2.4 for mg/dL.',
+  sugar: 'Fasting glucose: after at least 8 hours without food.',
+  bp: 'From a doctor’s visit or a home monitor.',
+  kidney: 'Sehat works out eGFR (kidney filtration) from creatinine, your age and sex.',
+};
 
 /** Empty text means "not on this report". */
-const toNumber = (text: string): number | null => (text.trim() === '' ? null : parseDecimal(text));
+function toValues(texts: Texts): LabValues {
+  const values: LabValues = {};
+  for (const { key } of TESTS) {
+    const text = texts[key]?.trim();
+    if (text) values[key] = parseDecimal(text);
+  }
+  return values;
+}
 
 export default function LabReportScreen() {
   const db = useSQLiteContext();
@@ -25,7 +46,8 @@ export default function LabReportScreen() {
 
   const [date, setDate] = useState(today);
   const [lab, setLab] = useState('');
-  const [values, setValues] = useState<Values>(EMPTY);
+  const [texts, setTexts] = useState<Texts>({});
+  const [open, setOpen] = useState<Set<GroupKey>>(new Set(['lipids']));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -35,28 +57,21 @@ export default function LabReportScreen() {
       if (!r) return;
       setDate(r.date);
       setLab(r.lab ?? '');
-      setValues({
-        total: r.total?.toString() ?? '',
-        ldl: r.ldl?.toString() ?? '',
-        hdl: r.hdl?.toString() ?? '',
-        triglycerides: r.triglycerides?.toString() ?? '',
-      });
+      setTexts(Object.fromEntries(Object.entries(r.values).map(([k, v]) => [k, String(v)])));
+      setOpen(new Set(TESTS.filter((t) => r.values[t.key] !== undefined).map((t) => t.group)));
     });
   }, [db, id]);
 
-  const numbers = Object.fromEntries(LIPIDS.map(({ key }) => [key, toNumber(values[key])])) as Record<
-    LipidKey,
-    number | null
-  >;
-  const errors = LIPIDS.map(({ key }) => validateLipid(key, numbers[key])).filter(Boolean);
-  const hasAny = LIPIDS.some(({ key }) => numbers[key] !== null);
+  const values = toValues(texts);
+  const errors = validateReport(values);
+  const hasAny = Object.keys(values).length > 0;
   const canSave = hasAny && errors.length === 0 && !saving;
 
   const onSave = async () => {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveLabReport(db, { id, date, lab: lab.trim() || null, ...numbers });
+      await saveLabReport(db, { id, date, lab: lab.trim() || null, values });
       router.back();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Could not save the report.');
@@ -78,27 +93,48 @@ export default function LabReportScreen() {
     ]);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <Stack.Screen options={{ title: id === null ? 'Add lab report' : 'Edit lab report' }} />
       <DateField label="Test date" value={date} onChange={setDate} maximumDate={today} />
-      <TextField label="Lab (optional)" value={lab} onChangeText={setLab} placeholder="e.g. City Lab" />
-      {LIPIDS.map(({ key, name }) => (
-        <NumberField
-          key={key}
-          label={key === 'total' ? 'Total cholesterol' : name}
-          value={values[key]}
-          onChangeText={(text) => setValues((v) => ({ ...v, [key]: text }))}
-          unit="mg/dL"
-        />
-      ))}
-      <Text style={styles.note}>Leave a value empty if it isn’t on your report.</Text>
+      <TextField label="Lab (optional)" value={lab} onChangeText={setLab} placeholder="e.g. Thyrocare" />
+      <Text style={styles.note}>Fill in only what’s on your report; leave the rest empty.</Text>
+
+      {GROUPS.map((g) =>
+        open.has(g.key) ? (
+          <View key={g.key} style={styles.group}>
+            <Text style={styles.groupTitle}>{g.name}</Text>
+            {testsIn(g.key).map((t) => (
+              <NumberField
+                key={t.key}
+                label={t.name}
+                value={texts[t.key] ?? ''}
+                onChangeText={(text) => setTexts((v) => ({ ...v, [t.key]: text }))}
+                unit={t.unit}
+              />
+            ))}
+            {GROUP_NOTES[g.key] && <Text style={styles.note}>{GROUP_NOTES[g.key]}</Text>}
+          </View>
+        ) : (
+          <Pressable
+            key={g.key}
+            style={styles.addGroup}
+            onPress={() => setOpen((s) => new Set(s).add(g.key))}
+            accessibilityRole="button"
+          >
+            <Text style={styles.addGroupText}>+ {g.name}</Text>
+          </Pressable>
+        ),
+      )}
 
       {errors.map((e) => (
         <Text key={e} style={styles.error}>
           {e}
         </Text>
       ))}
-
       {saveError && <Text style={styles.error}>{saveError}</Text>}
 
       <Pressable
@@ -122,9 +158,25 @@ export default function LabReportScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { padding: 20, gap: 14 },
-  note: { fontSize: 14, color: colors.muted },
+  note: { fontSize: 14, lineHeight: 20, color: colors.muted },
+  group: { gap: 12, paddingTop: 6 },
+  groupTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
+  addGroup: {
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  addGroupText: { fontSize: 16, fontWeight: '600', color: colors.teal },
   error: { fontSize: 15, color: colors.orangeDark },
-  button: { backgroundColor: colors.teal, borderRadius: radius.pill, paddingVertical: 16, alignItems: 'center' },
+  button: {
+    backgroundColor: colors.teal,
+    borderRadius: radius.pill,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: colors.surface, fontSize: 17, fontWeight: '600' },
   delete: { paddingVertical: 12, alignItems: 'center' },

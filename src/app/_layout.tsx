@@ -5,25 +5,31 @@ import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { DATABASE_NAME, migrate } from '../db/database';
+import { ProfileProvider } from '../db/profile';
 import { colors, radius } from '../theme';
 
 export default function RootLayout() {
   return (
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate}>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerTintColor: colors.ink,
-          headerShadowVisible: false,
-          contentStyle: { backgroundColor: colors.surface },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="goal" options={{ title: 'Set your goal', presentation: 'modal' }} />
-        <Stack.Screen name="log-weight" options={{ title: 'Log weight', presentation: 'modal' }} />
-        <Stack.Screen name="lab-report" options={{ title: 'Lab report', presentation: 'modal' }} />
-      </Stack>
+      <ProfileProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.ink,
+            headerShadowVisible: false,
+            contentStyle: { backgroundColor: colors.surface },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="goal" options={{ title: 'Set your goal', presentation: 'modal' }} />
+          <Stack.Screen name="log-weight" options={{ title: 'Log weight', presentation: 'modal' }} />
+          <Stack.Screen name="lab-report" options={{ title: 'Lab report', presentation: 'modal' }} />
+          <Stack.Screen name="log-waist" options={{ title: 'Log waist', presentation: 'modal' }} />
+          <Stack.Screen name="profile" options={{ title: 'Your details', presentation: 'modal' }} />
+          <Stack.Screen name="backup" options={{ title: 'Backup and export', presentation: 'modal' }} />
+        </Stack>
+      </ProfileProvider>
     </SQLiteProvider>
   );
 }
@@ -51,7 +57,19 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingTop: 64, gap: 14 },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
   body: { fontSize: 16, lineHeight: 22, color: colors.muted },
-  error: { fontSize: 13, fontFamily: 'monospace', color: colors.orangeDark, backgroundColor: colors.card, padding: 12, borderRadius: 12 },
-  button: { backgroundColor: colors.teal, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
+  error: {
+    fontSize: 13,
+    fontFamily: 'monospace',
+    color: colors.orangeDark,
+    backgroundColor: colors.card,
+    padding: 12,
+    borderRadius: 12,
+  },
+  button: {
+    backgroundColor: colors.teal,
+    borderRadius: radius.pill,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   buttonText: { color: colors.surface, fontSize: 16, fontWeight: '600' },
 });

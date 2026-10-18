@@ -27,6 +27,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="steps" options={{ title: 'Steps', tabBarIcon: tabIcon('walk') }} />
       <Tabs.Screen name="weight" options={{ title: 'Weight', tabBarIcon: tabIcon('scale-bathroom') }} />
       <Tabs.Screen name="labs" options={{ title: 'Labs', tabBarIcon: tabIcon('test-tube') }} />
+      <Tabs.Screen name="me" options={{ title: 'Me', tabBarIcon: tabIcon('account-circle-outline') }} />
     </Tabs>
   );
 }

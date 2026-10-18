@@ -3,7 +3,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 
 import { listLabReports } from '../db/database';
-import type { LabReport } from '../lib/cholesterol';
+import type { LabReport } from '../lib/labs';
 
 /** All saved lab reports, newest first. Reloads whenever the screen is focused. */
 export function useLabReports() {

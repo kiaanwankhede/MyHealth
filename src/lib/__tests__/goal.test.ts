@@ -217,6 +217,8 @@ describe('describeStatus', () => {
   });
 
   it('uses the singular for one day', () => {
-    expect(describeStatus({ ...base, behindKg: 0.05, behindDays: 1 }).text).toBe('0.1 kg behind plan (1 day)');
+    expect(describeStatus({ ...base, behindKg: 0.05, behindDays: 1 }).text).toBe(
+      '0.1 kg behind plan (1 day)',
+    );
   });
 });

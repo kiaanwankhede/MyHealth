@@ -2,12 +2,15 @@ import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BodyCard } from '../../components/BodyCard';
 import { ConnectCard } from '../../components/ConnectCard';
+import { PlateauCard } from '../../components/PlateauCard';
 import { WeightChart } from '../../components/WeightChart';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDate, formatDayMonth, formatRelativeDay } from '../../lib/dates';
 import { formatKg } from '../../lib/format';
 import { describeStatus } from '../../lib/goal';
+import { detectPlateau } from '../../lib/review';
 import { colors, radius } from '../../theme';
 
 export default function WeightScreen() {
@@ -72,6 +75,7 @@ export default function WeightScreen() {
                 {progress.paceKgPerWeek === null && (
                   <Text style={styles.note}>Pace and finish date appear after a week of weigh-ins.</Text>
                 )}
+                {!progress.reached && detectPlateau(series, today) && <PlateauCard />}
               </>
             )}
 
@@ -96,6 +100,8 @@ export default function WeightScreen() {
             )}
           </>
         )}
+
+        <BodyCard trendKg={latest?.trend ?? null} />
       </ScrollView>
     </SafeAreaView>
   );

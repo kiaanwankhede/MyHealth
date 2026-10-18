@@ -90,6 +90,38 @@ export function DateField({ label, value, onChange, minimumDate, maximumDate }: 
   );
 }
 
+type ChoiceFieldProps<T extends string> = {
+  label: string;
+  value: T | null;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+};
+
+/** A row of pills for picking one option. */
+export function ChoiceField<T extends string>({ label, value, options, onChange }: ChoiceFieldProps<T>) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.choices} accessibilityRole="radiogroup" accessibilityLabel={label}>
+        {options.map((o) => {
+          const selected = o.value === value;
+          return (
+            <Pressable
+              key={o.value}
+              style={[styles.choice, selected && styles.choiceSelected]}
+              onPress={() => onChange(o.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+            >
+              <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{o.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   field: { gap: 6 },
   label: { fontSize: 15, color: colors.muted },
@@ -108,4 +140,16 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 22, fontWeight: '600', color: colors.ink, paddingVertical: 10 },
   textInput: { fontSize: 18, fontWeight: '400' },
   unit: { fontSize: 16, color: colors.muted, marginLeft: 8 },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: {
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  choiceSelected: { borderColor: colors.teal, backgroundColor: colors.tealSoft },
+  choiceText: { fontSize: 15, color: colors.ink },
+  choiceTextSelected: { fontWeight: '700', color: colors.tealDark },
 });
