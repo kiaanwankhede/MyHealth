@@ -14,12 +14,12 @@ type Props = {
 const copy = {
   'needs-permission': {
     title: 'Connect Health Connect',
-    body: 'MyHealth reads your steps and weight from Health Connect, where Google Fit already saves them.',
+    body: 'Sehat reads your steps and weight from Health Connect, where Google Fit already saves them.',
     action: 'Allow access',
   },
   'needs-update': {
     title: 'Update Health Connect',
-    body: 'Your Health Connect app needs an update from the Play Store before MyHealth can read your data.',
+    body: 'Your Health Connect app needs an update from the Play Store before Sehat can read your data.',
     action: 'Open Play Store',
   },
   unavailable: {

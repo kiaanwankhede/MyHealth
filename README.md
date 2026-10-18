@@ -1,4 +1,4 @@
-# MyHealth
+# Sehat (सेहत)
 
 Personal Android health tracker: steps, weight, cholesterol and a weight-loss goal with a target date.
 
@@ -23,10 +23,10 @@ React Native + Expo (SDK 58) with Expo Router, `react-native-health-connect`, `e
 
 Every push builds the APK on GitHub Actions and publishes it as the latest release.
 
-1. On your phone, open **https://github.com/kiaanwankhede/MyHealth/releases/latest/download/myhealth.apk**
-   (or the repo's **Releases → latest**) and download `myhealth.apk`.
+1. On your phone, open **https://github.com/kiaanwankhede/MyHealth/releases/latest/download/sehat.apk**
+   (or the repo's **Releases → latest**) and download `sehat.apk`.
 2. Open it and allow installing from your browser/Files app.
-3. Set up Health Connect (see *On the phone* below), then open MyHealth → **Allow access**.
+3. Set up Health Connect (see *On the phone* below), then open Sehat → **Allow access**.
 
 Every build is signed with the same key, so a new APK installs over the old one and keeps your data.
 
@@ -60,7 +60,7 @@ For a standalone APK that runs without your computer: `npx eas-cli@latest build 
 - Android 14+: Health Connect is built in (Settings → Security & privacy → Privacy → Health Connect).
   Older Android: install **Health Connect** from the Play Store.
 - In **Google Fit** settings, turn on syncing with **Health Connect** so your steps and weight flow in.
-- Open MyHealth → **Allow access** and grant Steps and Weight.
+- Open Sehat → **Allow access** and grant Steps and Weight.
 
 ## Development
 

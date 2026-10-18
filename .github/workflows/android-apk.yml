@@ -1,7 +1,7 @@
 name: Build APK
 
 # Same flow as the Kharcha repo: build on every push, publish a release with a plain .apk
-# so the phone can always grab https://github.com/<owner>/<repo>/releases/latest/download/myhealth.apk
+# so the phone can always grab https://github.com/<owner>/<repo>/releases/latest/download/sehat.apk
 on:
   push:
   pull_request:
@@ -56,24 +56,24 @@ jobs:
         run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --stacktrace
 
       - name: Name the APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk myhealth.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk sehat.apk
 
       - name: Publish release
         if: github.event_name != 'pull_request'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: MyHealth build ${{ github.run_number }}
+          name: Sehat build ${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          files: myhealth.apk
+          files: sehat.apk
           body: |
-            Install: download myhealth.apk below on your phone and open it.
-            Then in Google Fit settings turn on syncing with Health Connect, open MyHealth and tap Allow access.
+            Install: download sehat.apk below on your phone and open it.
+            Then in Google Fit settings turn on syncing with Health Connect, open Sehat and tap Allow access.
             Built from ${{ github.ref_name }} at ${{ github.sha }}.
 
       - uses: actions/upload-artifact@v4
         with:
-          name: myhealth-apk
-          path: myhealth.apk
+          name: sehat-apk
+          path: sehat.apk
           if-no-files-found: error
