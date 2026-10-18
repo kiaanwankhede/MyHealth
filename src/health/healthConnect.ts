@@ -10,13 +10,15 @@ import {
   RecordingMethod,
   requestPermission,
   SdkAvailabilityStatus,
+  SleepStageType,
 } from 'react-native-health-connect';
 
 import { WEIGHT_LOOKBACK_DAYS } from '../config';
 import { addDays, startOfLocalDay, toISODate } from '../lib/dates';
 import type { DailySteps } from '../lib/steps';
 import type { WeightReading } from '../lib/goal';
-import { hasAllPermissions, REQUESTED_PERMISSIONS } from './permissions';
+import type { HeartReading, SleepSession } from '../lib/sleep';
+import { CORE_PERMISSIONS, hasAllPermissions, REQUESTED_PERMISSIONS, WATCH_PERMISSIONS } from './permissions';
 
 export type HealthConnectStatus =
   | 'unavailable' // Health Connect not installed / not supported on this device
@@ -41,10 +43,20 @@ export async function getHealthConnectStatus(): Promise<HealthConnectStatus> {
   return hasAllPermissions(await getGrantedPermissions()) ? 'ready' : 'needs-permission';
 }
 
-/** True when every requested permission is granted, including the optional ones (write, past data). */
+/** True when steps and weight access is complete, including the optional parts (write, past data). */
 export async function hasFullAccess(): Promise<boolean> {
   if (!(await ensureInitialized())) return false;
-  return hasAllPermissions(await getGrantedPermissions(), REQUESTED_PERMISSIONS);
+  return hasAllPermissions(await getGrantedPermissions(), CORE_PERMISSIONS);
+}
+
+/** Which kinds of watch data Sehat may read. */
+export async function getWatchAccess(): Promise<{ sleep: boolean; heart: boolean }> {
+  if (!(await ensureInitialized())) return { sleep: false, heart: false };
+  const granted = await getGrantedPermissions();
+  return {
+    sleep: hasAllPermissions(granted, [WATCH_PERMISSIONS[0]]),
+    heart: hasAllPermissions(granted, [WATCH_PERMISSIONS[1]]),
+  };
 }
 
 /** Shows the Health Connect permission sheet. Resolves true if the required reads were granted. */
@@ -129,4 +141,38 @@ export async function writeWeight(kg: number, time: Date): Promise<void> {
       metadata: { recordingMethod: RecordingMethod.RECORDING_METHOD_MANUAL_ENTRY },
     },
   ]);
+}
+
+/** Sleep sessions that ended between `from` and `to`, with awake stages marked. */
+export async function readSleepSessions(from: Date, to: Date): Promise<SleepSession[]> {
+  const sessions: SleepSession[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await readRecords('SleepSession', {
+      timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
+      pageSize: 500,
+      pageToken,
+    });
+    for (const r of page.records) {
+      sessions.push({
+        start: new Date(r.startTime),
+        end: new Date(r.endTime),
+        stages: (r.stages ?? []).map((st) => ({
+          start: new Date(st.startTime),
+          end: new Date(st.endTime),
+          awake: st.stage === SleepStageType.AWAKE || st.stage === SleepStageType.OUT_OF_BED,
+        })),
+      });
+    }
+    pageToken = page.pageToken || undefined;
+  } while (pageToken);
+  return sessions;
+}
+
+export async function readRestingHeartRate(from: Date, to: Date): Promise<HeartReading[]> {
+  const { records } = await readRecords('RestingHeartRate', {
+    timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
+    pageSize: 500,
+  });
+  return records.map((r) => ({ time: new Date(r.time), bpm: r.beatsPerMinute }));
 }

@@ -12,12 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectCard } from '../../components/ConnectCard';
 import { PlateauCard } from '../../components/PlateauCard';
+import { SleepHeartCard } from '../../components/SleepHeartCard';
 import { StepsRing } from '../../components/StepsRing';
 import { WeeklyCard } from '../../components/WeeklyCard';
 import { useProfile } from '../../db/profile';
 import { useLabReports } from '../../health/useLabReports';
 import { useSteps } from '../../health/useSteps';
 import { useTodayHealth } from '../../health/useTodayHealth';
+import { useWatchData } from '../../health/useWatchData';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayHeading, formatDayMonth, formatRelativeDay, greetingFor } from '../../lib/dates';
 import { formatCount, formatKg, percentOfGoal } from '../../lib/format';
@@ -33,6 +35,7 @@ export default function TodayScreen() {
   const weightGoal = useWeightGoal();
   const stepHistory = useSteps();
   const { reports } = useLabReports();
+  const watch = useWatchData();
   const { profile } = useProfile();
   const stepGoal = profile.stepGoal;
   const now = new Date();
@@ -57,6 +60,7 @@ export default function TodayScreen() {
               refresh();
               weightGoal.reload();
               stepHistory.reload();
+              watch.reload();
             }}
           />
         }
@@ -117,6 +121,7 @@ export default function TodayScreen() {
 
             <GoalCard {...weightGoal} />
             {plateau && <PlateauCard />}
+            <SleepHeartCard sleep={watch.sleep} heart={watch.heart} />
 
             <Pressable
               style={[styles.card, styles.rowBetween]}

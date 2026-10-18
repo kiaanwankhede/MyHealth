@@ -1,7 +1,7 @@
 import type { Permission, ReadHealthDataHistoryPermission } from 'react-native-health-connect';
 
-/** Everything the app asks Health Connect for. Must match android.permissions in app.json. */
-export const REQUESTED_PERMISSIONS: (Permission | ReadHealthDataHistoryPermission)[] = [
+/** Steps, weight and their history: the "Allow access" prompts on Steps and Weight are about these. */
+export const CORE_PERMISSIONS: (Permission | ReadHealthDataHistoryPermission)[] = [
   { accessType: 'read', recordType: 'Steps' },
   { accessType: 'read', recordType: 'Weight' },
   { accessType: 'write', recordType: 'Weight' },
@@ -9,6 +9,15 @@ export const REQUESTED_PERMISSIONS: (Permission | ReadHealthDataHistoryPermissio
   // so a goal that started earlier would have no history.
   { accessType: 'read', recordType: 'ReadHealthDataHistory' },
 ];
+
+/** Optional data a watch usually provides; Today shows it only when it's there. */
+export const WATCH_PERMISSIONS: Permission[] = [
+  { accessType: 'read', recordType: 'SleepSession' },
+  { accessType: 'read', recordType: 'RestingHeartRate' },
+];
+
+/** Everything the app asks Health Connect for. Must match android.permissions in app.json. */
+export const REQUESTED_PERMISSIONS = [...CORE_PERMISSIONS, ...WATCH_PERMISSIONS];
 
 /**
  * The app can't work without these. Write access (logging a weigh-in) and past-data access

@@ -4,12 +4,15 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '../../db/profile';
+import { useWatchData } from '../../health/useWatchData';
 import { formatCount } from '../../lib/format';
 import { HEART_RISK_LABELS } from '../../lib/profile';
 import { colors, radius } from '../../theme';
 
 export default function MeScreen() {
   const { profile } = useProfile();
+  const watch = useWatchData();
+  const watchAllowed = watch.access?.sleep && watch.access.heart;
   const details = [
     profile.heightCm ? `${profile.heightCm} cm` : 'Height not set',
     profile.sex ? (profile.sex === 'male' ? 'Male' : 'Female') : null,
@@ -47,9 +50,12 @@ export default function MeScreen() {
   );
 }
 
-function Item({ title, subtitle, href }: { title: string; subtitle: string; href: Href }) {
+type ItemProps = { title: string; subtitle: string } & ({ href: Href } | { onPress: () => void });
+
+function Item({ title, subtitle, ...action }: ItemProps) {
+  const onPress = 'href' in action ? () => router.push(action.href) : action.onPress;
   return (
-    <Pressable style={styles.item} onPress={() => router.push(href)} accessibilityRole="button">
+    <Pressable style={styles.item} onPress={onPress} accessibilityRole="button">
       <View style={{ flex: 1 }}>
         <Text style={styles.itemTitle}>{title}</Text>
         <Text style={styles.itemSubtitle}>{subtitle}</Text>

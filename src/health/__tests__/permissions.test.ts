@@ -1,4 +1,10 @@
-import { hasAllPermissions, REQUESTED_PERMISSIONS, REQUIRED_PERMISSIONS } from '../permissions';
+import {
+  CORE_PERMISSIONS,
+  hasAllPermissions,
+  REQUESTED_PERMISSIONS,
+  REQUIRED_PERMISSIONS,
+  WATCH_PERMISSIONS,
+} from '../permissions';
 
 describe('hasAllPermissions', () => {
   it('requires read access to steps and weight', () => {
@@ -40,5 +46,10 @@ describe('hasAllPermissions', () => {
       { accessType: 'read', recordType: 'Weight' },
     ];
     expect(hasAllPermissions(readsOnly, REQUESTED_PERMISSIONS)).toBe(false);
+  });
+
+  it('keeps watch data out of the core set', () => {
+    expect(hasAllPermissions(CORE_PERMISSIONS, CORE_PERMISSIONS)).toBe(true);
+    expect(hasAllPermissions(CORE_PERMISSIONS, WATCH_PERMISSIONS)).toBe(false);
   });
 });
