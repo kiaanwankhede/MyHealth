@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  APK_TAG: build-10
+  APK_TAG: build-12
 
 jobs:
   launch:
