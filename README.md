@@ -74,6 +74,14 @@ local storage (SQLite: goals, lab reports) in `src/db/`, pure helpers in `src/li
 `src/lib/goal.ts`, step maths (including the retro goal) in `src/lib/steps.ts` and cholesterol ranges in
 `src/lib/cholesterol.ts`, each covered by tests in `src/lib/__tests__/`.
 
+### Home-screen widget
+
+Long-press the home screen → Widgets → **Sehat** (4×2, resizable). It shows today's steps with a
+progress bar, the retro-goal line, and — when wide enough — the weight trend and goal status. It
+updates whenever the app is opened and every 30 minutes in the background (steps only, if Health
+Connect background access is allowed; otherwise it shows the last values the app saw). Tap it to open
+Sehat.
+
 ### Retro step goal
 
 Once today's step goal is met, Sehat checks whether today and yesterday together reach 2 × the goal;

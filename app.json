@@ -22,7 +22,8 @@
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_WEIGHT",
         "android.permission.health.WRITE_WEIGHT",
-        "android.permission.health.READ_HEALTH_DATA_HISTORY"
+        "android.permission.health.READ_HEALTH_DATA_HISTORY",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -38,7 +39,25 @@
         }
       ],
       "expo-sqlite",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Sehat",
+              "label": "Sehat \u2013 steps today",
+              "description": "Today's steps, retro goal and weight trend",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ]
     ]
   }
 }

@@ -1,4 +1,6 @@
 import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -23,6 +25,8 @@ import { classify } from '../../lib/cholesterol';
 import { describeStatus } from '../../lib/goal';
 import { describeRetro, retroGoal } from '../../lib/steps';
 import { colors, radius, toneColors } from '../../theme';
+import { buildSnapshot } from '../../widget/snapshot';
+import { updateWidget } from '../../widget/updateWidget';
 
 export default function TodayScreen() {
   const { status, steps, weight, error, refreshing, refresh, connect } = useTodayHealth();
@@ -36,6 +40,20 @@ export default function TodayScreen() {
   if (steps !== null) newestFirst[0] = steps;
   const retro = retroGoal(newestFirst, DAILY_STEP_GOAL);
   const latestLdl = reports?.find((r) => r.ldl !== null);
+
+  // Keep the home-screen widget in step with what this screen shows.
+  const db = useSQLiteContext();
+  const trendKg = weightGoal.latest?.trend ?? null;
+  const widgetKey = `${steps}|${retro.state}|${trendKg}|${weightGoal.progress?.percent}|${weightGoal.progress?.behindKg}`;
+  useEffect(() => {
+    if (status !== 'ready' || steps === null) return;
+    updateWidget(
+      db,
+      buildSnapshot({ steps, goal: DAILY_STEP_GOAL, retro, trendKg, progress: weightGoal.progress, now: new Date() }),
+    ).catch(() => {});
+    // widgetKey captures every value the widget shows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [db, status, widgetKey]);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>

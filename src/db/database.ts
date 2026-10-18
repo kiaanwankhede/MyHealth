@@ -41,6 +41,23 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
       PRAGMA user_version = 2;
     `);
   }
+
+  if (version < 3) {
+    // Small key/value store, e.g. the home-screen widget's last snapshot.
+    await db.execAsync(`
+      CREATE TABLE kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      PRAGMA user_version = 3;
+    `);
+  }
+}
+
+export async function getValue(db: SQLiteDatabase, key: string): Promise<string | null> {
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', key);
+  return row?.value ?? null;
+}
+
+export async function setValue(db: SQLiteDatabase, key: string, value: string): Promise<void> {
+  await db.runAsync('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)', key, value);
 }
 
 type GoalRow = { start_date: string; start_kg: number; target_kg: number; target_date: string };
