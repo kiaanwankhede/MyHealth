@@ -7,7 +7,7 @@ import { DateField, KgField } from '../components/FormFields';
 import { getCurrentGoal, saveGoal } from '../db/database';
 import { readLatestWeight } from '../health/healthConnect';
 import { addDays, formatDate, startOfLocalDay } from '../lib/dates';
-import { formatKg, parseKg } from '../lib/format';
+import { formatKg, parseDecimal } from '../lib/format';
 import { planGoal, validateGoal, type Goal } from '../lib/goal';
 import { colors, radius } from '../theme';
 
@@ -51,8 +51,8 @@ export default function GoalScreen() {
 
   const goal: Goal = {
     startDate,
-    startKg: parseKg(startKg),
-    targetKg: parseKg(targetKg),
+    startKg: parseDecimal(startKg),
+    targetKg: parseDecimal(targetKg),
     targetDate,
   };
   const error = startKg && targetKg ? validateGoal(goal) : null;

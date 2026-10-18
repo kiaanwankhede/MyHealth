@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="goal" options={{ title: 'Set your goal', presentation: 'modal' }} />
         <Stack.Screen name="log-weight" options={{ title: 'Log weight', presentation: 'modal' }} />
+        <Stack.Screen name="lab-report" options={{ title: 'Lab report', presentation: 'modal' }} />
       </Stack>
     </SQLiteProvider>
   );

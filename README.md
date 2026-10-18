@@ -11,8 +11,8 @@ Cholesterol is entered by hand from lab reports. All data stays on the phone.
 |---|---|---|
 | 1. Foundation | Expo project, Health Connect access, Today screen with steps + latest weight | ✅ |
 | 2. Weight & goal | Goal setup, trend/plan lines, ahead/behind, log a weigh-in | ✅ |
-| 3. Steps & labs | Steps screen, cholesterol entry, full Today screen | next |
-| 4. Polish | Reminders, CSV export, dark mode | |
+| 3. Steps & labs | Steps screen with retro goal, cholesterol lab reports, full Today screen | ✅ |
+| 4. Polish | Settings (step goal, height), reminders, CSV export, dark mode | next |
 
 ## Stack
 
@@ -70,5 +70,12 @@ npm run typecheck # tsc --noEmit
 ```
 
 Code lives in `src/`: routes in `src/app/` (Expo Router), Health Connect access in `src/health/`,
-local storage (SQLite: goals) in `src/db/`, pure helpers in `src/lib/`. All weight-goal maths is in
-`src/lib/goal.ts` and covered by `src/lib/__tests__/goal.test.ts`.
+local storage (SQLite: goals, lab reports) in `src/db/`, pure helpers in `src/lib/`. All weight-goal maths is in
+`src/lib/goal.ts`, step maths (including the retro goal) in `src/lib/steps.ts` and cholesterol ranges in
+`src/lib/cholesterol.ts`, each covered by tests in `src/lib/__tests__/`.
+
+### Retro step goal
+
+Once today's step goal is met, Sehat checks whether today and yesterday together reach 2 × the goal;
+if so, today plus the last two days against 3 × the goal, and so on, up to 30 days. It shows how many
+days are covered and how many more steps would cover one more day.

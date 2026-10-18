@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { fromISODate, toISODate } from '../lib/dates';
+import type { LabReport } from '../lib/cholesterol';
 import type { Goal } from '../lib/goal';
 
 export const DATABASE_NAME = 'sehat.db';
@@ -21,6 +22,23 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
         created_at TEXT NOT NULL
       );
       PRAGMA user_version = 1;
+    `);
+  }
+
+  if (version < 2) {
+    // All lipid values in mg/dL; any of them may be missing from a report.
+    await db.execAsync(`
+      CREATE TABLE lab_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        lab TEXT,
+        total REAL,
+        ldl REAL,
+        hdl REAL,
+        triglycerides REAL,
+        created_at TEXT NOT NULL
+      );
+      PRAGMA user_version = 2;
     `);
   }
 }
@@ -50,4 +68,61 @@ export async function saveGoal(db: SQLiteDatabase, goal: Goal): Promise<void> {
     toISODate(goal.targetDate),
     new Date().toISOString(),
   );
+}
+
+type LabReportRow = {
+  id: number;
+  date: string;
+  lab: string | null;
+  total: number | null;
+  ldl: number | null;
+  hdl: number | null;
+  triglycerides: number | null;
+};
+
+const fromRow = (r: LabReportRow): LabReport => ({ ...r, date: fromISODate(r.date) });
+
+/** Newest first. */
+export async function listLabReports(db: SQLiteDatabase): Promise<LabReport[]> {
+  const rows = await db.getAllAsync<LabReportRow>(
+    'SELECT id, date, lab, total, ldl, hdl, triglycerides FROM lab_reports ORDER BY date DESC, id DESC',
+  );
+  return rows.map(fromRow);
+}
+
+export async function getLabReport(db: SQLiteDatabase, id: number): Promise<LabReport | null> {
+  const row = await db.getFirstAsync<LabReportRow>(
+    'SELECT id, date, lab, total, ldl, hdl, triglycerides FROM lab_reports WHERE id = ?',
+    id,
+  );
+  return row ? fromRow(row) : null;
+}
+
+/** Inserts when `id` is null, otherwise updates that report. */
+export async function saveLabReport(db: SQLiteDatabase, report: Omit<LabReport, 'id'> & { id: number | null }) {
+  const values = [
+    toISODate(report.date),
+    report.lab,
+    report.total,
+    report.ldl,
+    report.hdl,
+    report.triglycerides,
+  ] as const;
+  if (report.id === null) {
+    await db.runAsync(
+      'INSERT INTO lab_reports (date, lab, total, ldl, hdl, triglycerides, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ...values,
+      new Date().toISOString(),
+    );
+  } else {
+    await db.runAsync(
+      'UPDATE lab_reports SET date = ?, lab = ?, total = ?, ldl = ?, hdl = ?, triglycerides = ? WHERE id = ?',
+      ...values,
+      report.id,
+    );
+  }
+}
+
+export async function deleteLabReport(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM lab_reports WHERE id = ?', id);
 }

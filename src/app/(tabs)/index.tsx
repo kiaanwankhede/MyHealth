@@ -13,18 +13,29 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ConnectCard } from '../../components/ConnectCard';
 import { StepsRing } from '../../components/StepsRing';
 import { DAILY_STEP_GOAL } from '../../config';
+import { useLabReports } from '../../health/useLabReports';
+import { useSteps } from '../../health/useSteps';
 import { useTodayHealth } from '../../health/useTodayHealth';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayHeading, formatDayMonth, formatRelativeDay, greetingFor } from '../../lib/dates';
 import { formatCount, formatKg, percentOfGoal } from '../../lib/format';
+import { classify } from '../../lib/cholesterol';
 import { describeStatus } from '../../lib/goal';
-import { colors, radius } from '../../theme';
+import { describeRetro, retroGoal } from '../../lib/steps';
+import { colors, radius, toneColors } from '../../theme';
 
 export default function TodayScreen() {
   const { status, steps, weight, error, refreshing, refresh, connect } = useTodayHealth();
   const weightGoal = useWeightGoal();
+  const stepHistory = useSteps();
+  const { reports } = useLabReports();
   const now = new Date();
   const stepsPercent = percentOfGoal(steps ?? 0, DAILY_STEP_GOAL);
+  // History newest first, with today's live count in front.
+  const newestFirst = stepHistory.days.map((d) => d.steps).reverse();
+  if (steps !== null) newestFirst[0] = steps;
+  const retro = retroGoal(newestFirst, DAILY_STEP_GOAL);
+  const latestLdl = reports?.find((r) => r.ldl !== null);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -36,6 +47,7 @@ export default function TodayScreen() {
             onRefresh={() => {
               refresh();
               weightGoal.reload();
+              stepHistory.reload();
             }}
           />
         }
@@ -60,14 +72,21 @@ export default function TodayScreen() {
 
         {status === 'ready' && (
           <>
-            <View style={[styles.card, styles.row]}>
-              <StepsRing percent={stepsPercent} />
-              <View>
-                <Text style={styles.bigNumber}>{formatCount(steps ?? 0)}</Text>
-                <Text style={styles.muted}>of {formatCount(DAILY_STEP_GOAL)} steps</Text>
-                <Text style={styles.stepsPercent}>{stepsPercent}% of goal</Text>
+            <Pressable
+              style={[styles.card, styles.stepsCard]}
+              onPress={() => router.push('/steps')}
+              accessibilityRole="button"
+            >
+              <View style={styles.row}>
+                <StepsRing percent={stepsPercent} />
+                <View>
+                  <Text style={styles.bigNumber}>{formatCount(steps ?? 0)}</Text>
+                  <Text style={styles.muted}>of {formatCount(DAILY_STEP_GOAL)} steps</Text>
+                  <Text style={styles.stepsPercent}>{stepsPercent}% of goal</Text>
+                </View>
               </View>
-            </View>
+              {retro.state !== 'today' && <Text style={styles.retro}>{describeRetro(retro)}</Text>}
+            </Pressable>
 
             <Pressable
               style={[styles.card, styles.rowBetween]}
@@ -88,10 +107,35 @@ export default function TodayScreen() {
             </Pressable>
 
             <GoalCard {...weightGoal} />
+
+            <Pressable
+              style={[styles.card, styles.rowBetween]}
+              onPress={() => router.push(latestLdl ? '/labs' : '/lab-report')}
+              accessibilityRole="button"
+            >
+              <View>
+                <Text style={styles.muted}>LDL cholesterol</Text>
+                {latestLdl ? (
+                  <LdlStatus ldl={latestLdl.ldl!} date={latestLdl.date} />
+                ) : (
+                  <Text style={styles.trend}>Add a lab report</Text>
+                )}
+              </View>
+              <Text style={styles.value}>{latestLdl ? `${formatCount(latestLdl.ldl!)} mg/dL` : '–'}</Text>
+            </Pressable>
           </>
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function LdlStatus({ ldl, date }: { ldl: number; date: Date }) {
+  const c = classify('ldl', ldl);
+  return (
+    <Text style={[styles.ldlStatus, { color: toneColors[c.tone] }]}>
+      {c.label} · {formatDayMonth(date)}
+    </Text>
   );
 }
 
@@ -144,6 +188,9 @@ const styles = StyleSheet.create({
   muted: { fontSize: 16, color: colors.muted },
   stepsPercent: { fontSize: 16, fontWeight: '600', color: colors.orangeDark },
   trend: { fontSize: 16, fontWeight: '600', color: colors.teal },
+  stepsCard: { gap: 12 },
+  retro: { fontSize: 15, fontWeight: '600', color: colors.orangeDark },
+  ldlStatus: { fontSize: 15, fontWeight: '600' },
   goalCard: { backgroundColor: colors.tealSoft, gap: 8 },
   goalTitle: { fontSize: 17, fontWeight: '600', color: colors.ink },
   goalBody: { fontSize: 15, color: colors.tealDark },

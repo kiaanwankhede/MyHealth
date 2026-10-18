@@ -17,3 +17,11 @@ export const colors = {
 };
 
 export const radius = { card: 20, pill: 16 };
+
+/** Text colour for a lab value's status (classify() tone). */
+export const toneColors = {
+  good: colors.tealDark,
+  ok: colors.tealDark,
+  warn: '#8A3A0E',
+  bad: '#A3241B',
+} as const;

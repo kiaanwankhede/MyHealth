@@ -1,4 +1,5 @@
 import {
+  aggregateGroupByPeriod,
   aggregateRecord,
   getGrantedPermissions,
   getSdkStatus,
@@ -12,7 +13,8 @@ import {
 } from 'react-native-health-connect';
 
 import { WEIGHT_LOOKBACK_DAYS } from '../config';
-import { addDays, startOfLocalDay } from '../lib/dates';
+import { addDays, startOfLocalDay, toISODate } from '../lib/dates';
+import type { DailySteps } from '../lib/steps';
 import type { WeightReading } from '../lib/goal';
 import { hasAllPermissions, REQUESTED_PERMISSIONS } from './permissions';
 
@@ -67,6 +69,23 @@ export async function readStepsToday(now: Date = new Date()): Promise<number> {
     },
   });
   return result.COUNT_TOTAL ?? 0;
+}
+
+/** Daily step totals for the last `days` days including today, oldest first; days without data are 0. */
+export async function readDailySteps(days: number, now: Date = new Date()): Promise<DailySteps[]> {
+  const first = addDays(startOfLocalDay(now), -(days - 1));
+  const groups = await aggregateGroupByPeriod({
+    recordType: 'Steps',
+    timeRangeFilter: { operator: 'between', startTime: first.toISOString(), endTime: now.toISOString() },
+    timeRangeSlicer: { period: 'DAYS', length: 1 },
+  });
+  // startTime comes back as a local date-time ("2026-10-17T00:00"), one group per day with data.
+  const byDay = new Map<string, number>();
+  for (const g of groups) byDay.set(g.startTime.slice(0, 10), g.result.COUNT_TOTAL ?? 0);
+  return Array.from({ length: days }, (_, i) => {
+    const date = addDays(first, i);
+    return { date, steps: byDay.get(toISODate(date)) ?? 0 };
+  });
 }
 
 export async function readLatestWeight(now: Date = new Date()): Promise<WeightReading | null> {

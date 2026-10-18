@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { DateField, KgField } from '../components/FormFields';
 import { openHealthConnectSettings, readLatestWeight, writeWeight } from '../health/healthConnect';
 import { calendarDaysBetween, startOfLocalDay } from '../lib/dates';
-import { formatKg, parseKg } from '../lib/format';
+import { formatKg, parseDecimal } from '../lib/format';
 import { colors, radius } from '../theme';
 
 /** A past day's weigh-in is recorded at 8 am; today's at the current time. */
@@ -29,7 +29,7 @@ export default function LogWeightScreen() {
       .catch(() => {});
   }, []);
 
-  const value = parseKg(kg);
+  const value = parseDecimal(kg);
   const valid = value > 20 && value < 400;
 
   const onSave = async () => {
