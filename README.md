@@ -9,9 +9,9 @@ Cholesterol is entered by hand from lab reports. All data stays on the phone.
 
 | Roadmap step | Scope | State |
 |---|---|---|
-| 1. Foundation | Expo project, Health Connect access, Today screen with steps + latest weight | ✅ this branch |
-| 2. Weight & goal | Goal setup, trend/plan lines, ahead/behind | next |
-| 3. Steps & labs | Steps screen, cholesterol entry, full Today screen | |
+| 1. Foundation | Expo project, Health Connect access, Today screen with steps + latest weight | ✅ |
+| 2. Weight & goal | Goal setup, trend/plan lines, ahead/behind, log a weigh-in | ✅ |
+| 3. Steps & labs | Steps screen, cholesterol entry, full Today screen | next |
 | 4. Polish | Reminders, CSV export, dark mode | |
 
 ## Stack
@@ -70,4 +70,5 @@ npm run typecheck # tsc --noEmit
 ```
 
 Code lives in `src/`: routes in `src/app/` (Expo Router), Health Connect access in `src/health/`,
-pure helpers in `src/lib/`.
+local storage (SQLite: goals) in `src/db/`, pure helpers in `src/lib/`. All weight-goal maths is in
+`src/lib/goal.ts` and covered by `src/lib/__tests__/goal.test.ts`.

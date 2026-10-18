@@ -1,36 +1,26 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { Tabs } from 'expo-router/js-tabs';
+import { Stack } from 'expo-router/stack';
+import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import type { ComponentProps } from 'react';
-import type { ColorValue } from 'react-native';
 
+import { DATABASE_NAME, migrate } from '../db/database';
 import { colors } from '../theme';
-
-type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
-
-function tabIcon(name: IconName) {
-  return ({ color, size }: { color: ColorValue; size: number }) => (
-    <MaterialCommunityIcons name={name} color={typeof color === 'string' ? color : undefined} size={size} />
-  );
-}
 
 export default function RootLayout() {
   return (
-    <>
+    <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate}>
       <StatusBar style="dark" />
-      <Tabs
+      <Stack
         screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.teal,
-          tabBarInactiveTintColor: colors.inactive,
-          tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.ink,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.surface },
         }}
       >
-        <Tabs.Screen name="index" options={{ title: 'Today', tabBarIcon: tabIcon('home-variant') }} />
-        <Tabs.Screen name="steps" options={{ title: 'Steps', tabBarIcon: tabIcon('walk') }} />
-        <Tabs.Screen name="weight" options={{ title: 'Weight', tabBarIcon: tabIcon('scale-bathroom') }} />
-        <Tabs.Screen name="labs" options={{ title: 'Labs', tabBarIcon: tabIcon('test-tube') }} />
-      </Tabs>
-    </>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="goal" options={{ title: 'Set your goal', presentation: 'modal' }} />
+        <Stack.Screen name="log-weight" options={{ title: 'Log weight', presentation: 'modal' }} />
+      </Stack>
+    </SQLiteProvider>
   );
 }

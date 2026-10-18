@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -57,10 +58,16 @@ export function useTodayHealth() {
     }
   }, [refresh]);
 
+  // Re-read whenever the screen is shown (e.g. after logging a weight)...
+  useFocusEffect(
+    useCallback(() => {
+      refresh();
+    }, [refresh]),
+  );
+
+  // ...and when the user comes back to the app (e.g. after walking, or after
+  // changing permissions in Health Connect settings).
   useEffect(() => {
-    refresh();
-    // Re-read when the user comes back to the app (e.g. after walking, or after
-    // changing permissions in Health Connect settings).
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') refresh();
     });

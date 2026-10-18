@@ -1,4 +1,4 @@
-import { formatCount, formatKg, percentOfGoal } from '../format';
+import { formatCount, formatKg, parseKg, percentOfGoal } from '../format';
 
 describe('formatCount', () => {
   it.each([
@@ -27,5 +27,20 @@ describe('percentOfGoal', () => {
     expect(percentOfGoal(15000, 10000)).toBe(100);
     expect(percentOfGoal(-5, 10000)).toBe(0);
     expect(percentOfGoal(100, 0)).toBe(0);
+  });
+});
+
+describe('parseKg', () => {
+  it('accepts dot or comma decimals', () => {
+    expect(parseKg('82.4')).toBe(82.4);
+    expect(parseKg(' 82,4 ')).toBe(82.4);
+    expect(parseKg('75')).toBe(75);
+  });
+
+  it('rejects anything else', () => {
+    expect(parseKg('')).toBeNaN();
+    expect(parseKg('82.')).toBeNaN();
+    expect(parseKg('8a')).toBeNaN();
+    expect(parseKg('-3')).toBeNaN();
   });
 });

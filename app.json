@@ -21,7 +21,8 @@
       "permissions": [
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_WEIGHT",
-        "android.permission.health.WRITE_WEIGHT"
+        "android.permission.health.WRITE_WEIGHT",
+        "android.permission.health.READ_HEALTH_DATA_HISTORY"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -36,7 +37,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

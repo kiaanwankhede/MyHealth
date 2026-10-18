@@ -38,3 +38,26 @@ export function greetingFor(date: Date): string {
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
 }
+
+/** "2026-10-17" for the local calendar day (used for storage). */
+export function toISODate(date: Date): string {
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
+/** Inverse of toISODate: local midnight of that day. */
+export function fromISODate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** "31 Mar 2027" */
+export function formatDate(date: Date): string {
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** "15 Apr" */
+export function formatDayMonth(date: Date): string {
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}

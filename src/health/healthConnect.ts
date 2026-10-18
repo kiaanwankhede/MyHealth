@@ -3,14 +3,17 @@ import {
   getGrantedPermissions,
   getSdkStatus,
   initialize,
+  insertRecords,
   openHealthConnectSettings,
   readRecords,
+  RecordingMethod,
   requestPermission,
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
 
 import { WEIGHT_LOOKBACK_DAYS } from '../config';
 import { addDays, startOfLocalDay } from '../lib/dates';
+import type { WeightReading } from '../lib/goal';
 import { hasAllPermissions, REQUESTED_PERMISSIONS } from './permissions';
 
 export type HealthConnectStatus =
@@ -19,7 +22,7 @@ export type HealthConnectStatus =
   | 'needs-permission'
   | 'ready';
 
-export type WeightReading = { kg: number; time: Date };
+export type { WeightReading };
 
 let initialized = false;
 
@@ -34,6 +37,12 @@ export async function getHealthConnectStatus(): Promise<HealthConnectStatus> {
   if (sdk === SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) return 'needs-update';
   if (!(await ensureInitialized())) return 'unavailable';
   return hasAllPermissions(await getGrantedPermissions()) ? 'ready' : 'needs-permission';
+}
+
+/** True when every requested permission is granted, including the optional ones (write, past data). */
+export async function hasFullAccess(): Promise<boolean> {
+  if (!(await ensureInitialized())) return false;
+  return hasAllPermissions(await getGrantedPermissions(), REQUESTED_PERMISSIONS);
 }
 
 /** Shows the Health Connect permission sheet. Resolves true if the required reads were granted. */
@@ -72,4 +81,33 @@ export async function readLatestWeight(now: Date = new Date()): Promise<WeightRe
   });
   const latest = records[0];
   return latest ? { kg: latest.weight.inKilograms, time: new Date(latest.time) } : null;
+}
+
+/** Every weigh-in between `from` and `to`, oldest first. */
+export async function readWeightHistory(from: Date, to: Date): Promise<WeightReading[]> {
+  const readings: WeightReading[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await readRecords('Weight', {
+      timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
+      ascendingOrder: true,
+      pageSize: 1000,
+      pageToken,
+    });
+    for (const r of page.records) readings.push({ kg: r.weight.inKilograms, time: new Date(r.time) });
+    pageToken = page.pageToken || undefined;
+  } while (pageToken);
+  return readings;
+}
+
+/** Saves a manual weigh-in to Health Connect, so Google Fit and other apps see it too. */
+export async function writeWeight(kg: number, time: Date): Promise<void> {
+  await insertRecords([
+    {
+      recordType: 'Weight',
+      weight: { value: kg, unit: 'kilograms' },
+      time: time.toISOString(),
+      metadata: { recordingMethod: RecordingMethod.RECORDING_METHOD_MANUAL_ENTRY },
+    },
+  ]);
 }

@@ -1,10 +1,14 @@
 import {
   addDays,
   calendarDaysBetween,
+  formatDate,
   formatDayHeading,
+  formatDayMonth,
+  fromISODate,
   formatRelativeDay,
   greetingFor,
   startOfLocalDay,
+  toISODate,
 } from '../dates';
 
 describe('startOfLocalDay', () => {
@@ -48,5 +52,18 @@ describe('formatting', () => {
     expect(greetingFor(new Date(2026, 9, 17, 6))).toBe('Good morning');
     expect(greetingFor(new Date(2026, 9, 17, 12))).toBe('Good afternoon');
     expect(greetingFor(new Date(2026, 9, 17, 18))).toBe('Good evening');
+  });
+});
+
+describe('ISO dates', () => {
+  it('round-trips local calendar days', () => {
+    const d = new Date(2027, 2, 31, 15, 30);
+    expect(toISODate(d)).toBe('2027-03-31');
+    expect(fromISODate('2027-03-31').getTime()).toBe(new Date(2027, 2, 31).getTime());
+  });
+
+  it('formats dates for display', () => {
+    expect(formatDate(new Date(2027, 2, 31))).toBe('31 Mar 2027');
+    expect(formatDayMonth(new Date(2027, 3, 15))).toBe('15 Apr');
   });
 });

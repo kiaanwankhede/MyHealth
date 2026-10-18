@@ -33,4 +33,12 @@ describe('hasAllPermissions', () => {
   it('is true when everything requested is granted', () => {
     expect(hasAllPermissions(REQUESTED_PERMISSIONS)).toBe(true);
   });
+
+  it('can check for the optional permissions too', () => {
+    const readsOnly = [
+      { accessType: 'read', recordType: 'Steps' },
+      { accessType: 'read', recordType: 'Weight' },
+    ];
+    expect(hasAllPermissions(readsOnly, REQUESTED_PERMISSIONS)).toBe(false);
+  });
 });
