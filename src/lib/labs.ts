@@ -407,11 +407,11 @@ export function retestMonths(group: GroupKey, reports: readonly LabReport[]): nu
   return 12;
 }
 
-export type Due = { group: GroupKey; name: string; last: Date; due: Date };
+export type RetestDate = { group: GroupKey; name: string; last: Date; due: Date };
 
-/** Groups the user has tested before whose re-test date has passed, most overdue first. */
-export function retestsDue(reports: readonly LabReport[], now: Date): Due[] {
-  const due: Due[] = [];
+/** When each group the user has tested before is next due, soonest first. */
+export function retestDates(reports: readonly LabReport[]): RetestDate[] {
+  const dates: RetestDate[] = [];
   for (const g of GROUPS) {
     // Lp(a) is a once-in-a-lifetime test, so it doesn't keep the cholesterol panel "fresh".
     const keys = testsIn(g.key)
@@ -419,11 +419,16 @@ export function retestsDue(reports: readonly LabReport[], now: Date): Due[] {
       .filter((k) => k !== 'lpa');
     const last = reports.find((r) => keys.some((k) => r.values[k] !== undefined))?.date;
     if (!last) continue;
-    const dueDate = new Date(last);
-    dueDate.setMonth(dueDate.getMonth() + retestMonths(g.key, reports));
-    if (dueDate <= now) due.push({ group: g.key, name: g.name, last, due: dueDate });
+    const due = new Date(last);
+    due.setMonth(due.getMonth() + retestMonths(g.key, reports));
+    dates.push({ group: g.key, name: g.name, last, due });
   }
-  return due.sort((a, b) => a.due.getTime() - b.due.getTime());
+  return dates.sort((a, b) => a.due.getTime() - b.due.getTime());
+}
+
+/** Groups whose re-test date has passed, most overdue first. */
+export function retestsDue(reports: readonly LabReport[], now: Date): RetestDate[] {
+  return retestDates(reports).filter((d) => d.due <= now);
 }
 
 /** A gentle once-only prompt: Lp(a) is worth measuring once, especially for South Asians. */

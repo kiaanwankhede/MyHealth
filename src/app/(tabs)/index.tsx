@@ -1,4 +1,6 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,12 +13,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectCard } from '../../components/ConnectCard';
+import { DoseList } from '../../components/DoseList';
 import { PlateauCard } from '../../components/PlateauCard';
 import { SleepHeartCard } from '../../components/SleepHeartCard';
 import { StepsRing } from '../../components/StepsRing';
 import { WeeklyCard } from '../../components/WeeklyCard';
 import { useProfile } from '../../db/profile';
 import { useLabReports } from '../../health/useLabReports';
+import { useMedicines } from '../../health/useMedicines';
 import { useSteps } from '../../health/useSteps';
 import { useTodayHealth } from '../../health/useTodayHealth';
 import { useWatchData } from '../../health/useWatchData';
@@ -27,6 +31,7 @@ import { describeStatus } from '../../lib/goal';
 import { classify, latest, type LabContext } from '../../lib/labs';
 import { ageOn } from '../../lib/profile';
 import { detectPlateau, weeklyReview } from '../../lib/review';
+import { syncReminders } from '../../notifications/reminders';
 import { describeRetro, retroGoal } from '../../lib/steps';
 import { colors, radius, toneColors } from '../../theme';
 
@@ -36,6 +41,15 @@ export default function TodayScreen() {
   const stepHistory = useSteps();
   const { reports } = useLabReports();
   const watch = useWatchData();
+  const meds = useMedicines();
+  const db = useSQLiteContext();
+
+  // Keep scheduled reminders in line with the latest data (e.g. a new lab report's due date).
+  useFocusEffect(
+    useCallback(() => {
+      syncReminders(db).catch(() => {});
+    }, [db]),
+  );
   const { profile } = useProfile();
   const stepGoal = profile.stepGoal;
   const now = new Date();
@@ -122,6 +136,14 @@ export default function TodayScreen() {
             <GoalCard {...weightGoal} />
             {plateau && <PlateauCard />}
             <SleepHeartCard sleep={watch.sleep} heart={watch.heart} />
+            {meds.today.length > 0 && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  Medicines · {meds.today.filter((d) => d.taken).length} of {meds.today.length} taken
+                </Text>
+                <DoseList doses={meds.today} onToggle={meds.toggle} />
+              </View>
+            )}
 
             <Pressable
               style={[styles.card, styles.rowBetween]}
@@ -206,6 +228,7 @@ const styles = StyleSheet.create({
   stepsPercent: { fontSize: 16, fontWeight: '600', color: colors.orangeDark },
   trend: { fontSize: 16, fontWeight: '600', color: colors.teal },
   stepsCard: { gap: 12 },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: colors.ink },
   retro: { fontSize: 15, fontWeight: '600', color: colors.orangeDark },
   ldlStatus: { fontSize: 15, fontWeight: '600' },
   goalCard: { backgroundColor: colors.tealSoft, gap: 8 },

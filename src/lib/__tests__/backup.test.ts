@@ -15,12 +15,29 @@ const data: BackupData = {
     { date: new Date(2026, 3, 2), lab: null, values: { ldl: 139 } },
   ],
   waist: [{ date: new Date(2026, 9, 1), cm: 94.5 }],
+  medicines: [
+    {
+      id: 7,
+      name: 'Rosuvastatin',
+      dose: '10 mg',
+      times: ['21:00'],
+      remind: true,
+      startDate: new Date(2026, 6, 1),
+      stoppedDate: null,
+    },
+  ],
+  doses: [{ medicineId: 7, date: '2026-10-17', time: '21:00' }],
   settings: { profile: '{"heightCm":172}' },
 };
 
 describe('backup', () => {
   it('round-trips everything through JSON', () => {
     expect(parseBackupJson(toBackupJson(data, new Date()))).toEqual(data);
+  });
+
+  it('reads older backups without medicines', () => {
+    const text = '{"app":"sehat","version":1,"goals":[],"labReports":[],"waist":[],"settings":{}}';
+    expect(parseBackupJson(text)).toMatchObject({ medicines: [], doses: [] });
   });
 
   it('rejects files that are not Sehat backups', () => {

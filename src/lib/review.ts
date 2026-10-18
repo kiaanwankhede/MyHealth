@@ -2,7 +2,7 @@
 
 import { addDays, calendarDaysBetween, startOfLocalDay } from './dates';
 import type { TrendPoint } from './goal';
-import { retestsDue, type Due, type LabReport } from './labs';
+import { retestsDue, type LabReport, type RetestDate } from './labs';
 import type { DailySteps } from './steps';
 
 /** Trend weight on a day: the last trend point on or before it. */
@@ -21,7 +21,7 @@ export type WeeklyReview = {
   /** Over the last 7 complete days (today is still going). */
   stepsAverage: number | null;
   goalDays: number;
-  labsDue: Due[];
+  labsDue: RetestDate[];
 };
 
 export function weeklyReview(args: {

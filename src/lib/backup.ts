@@ -5,6 +5,7 @@ import { fromISODate, toISODate } from './dates';
 import type { Goal } from './goal';
 import { TESTS, type LabReport, type LabValues, type TestKey } from './labs';
 import type { WaistEntry } from './body';
+import { isTime, type Medicine, type TakenDose } from './medicines';
 
 export const BACKUP_VERSION = 1;
 
@@ -12,6 +13,9 @@ export type BackupData = {
   goals: (Goal & { createdAt: string })[];
   labReports: Omit<LabReport, 'id'>[];
   waist: Omit<WaistEntry, 'id'>[];
+  /** Ids only link doses to medicines within the file. */
+  medicines: Medicine[];
+  doses: TakenDose[];
   /** Key/value settings such as the profile, as stored. */
   settings: Record<string, string>;
 };
@@ -23,6 +27,16 @@ type BackupFile = {
   goals: { startDate: string; startKg: number; targetKg: number; targetDate: string; createdAt: string }[];
   labReports: { date: string; lab: string | null; values: LabValues }[];
   waist: { date: string; cm: number }[];
+  medicines?: {
+    id: number;
+    name: string;
+    dose: string | null;
+    times: string[];
+    remind: boolean;
+    startDate: string;
+    stoppedDate: string | null;
+  }[];
+  doses?: TakenDose[];
   settings: Record<string, string>;
 };
 
@@ -40,6 +54,16 @@ export function toBackupJson(data: BackupData, now: Date): string {
     })),
     labReports: data.labReports.map((r) => ({ date: toISODate(r.date), lab: r.lab, values: r.values })),
     waist: data.waist.map((w) => ({ date: toISODate(w.date), cm: w.cm })),
+    medicines: data.medicines.map((m) => ({
+      id: m.id,
+      name: m.name,
+      dose: m.dose,
+      times: m.times,
+      remind: m.remind,
+      startDate: toISODate(m.startDate),
+      stoppedDate: m.stoppedDate ? toISODate(m.stoppedDate) : null,
+    })),
+    doses: data.doses,
     settings: data.settings,
   };
   return JSON.stringify(file, null, 2);
@@ -89,6 +113,23 @@ export function parseBackupJson(text: string): BackupData {
       if (!isNum(w.cm)) throw new Error('The backup has an invalid waist entry.');
       return { date: date(w.date), cm: w.cm };
     }),
+    medicines: list<NonNullable<BackupFile['medicines']>[number]>(file.medicines).map((m) => {
+      if (!isNum(m.id) || typeof m.name !== 'string' || !Array.isArray(m.times) || !m.times.every(isTime)) {
+        throw new Error('The backup has an invalid medicine.');
+      }
+      return {
+        id: m.id,
+        name: m.name,
+        dose: typeof m.dose === 'string' ? m.dose : null,
+        times: m.times,
+        remind: m.remind !== false,
+        startDate: date(m.startDate),
+        stoppedDate: m.stoppedDate ? date(m.stoppedDate) : null,
+      };
+    }),
+    doses: list<TakenDose>(file.doses).filter(
+      (d) => isNum(d.medicineId) && typeof d.date === 'string' && ISO_DATE.test(d.date) && isTime(d.time),
+    ),
     settings: Object.fromEntries(
       Object.entries(file.settings ?? {}).filter(([, v]) => typeof v === 'string'),
     ) as Record<string, string>,

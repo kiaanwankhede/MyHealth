@@ -4,6 +4,8 @@ import { fromISODate, toISODate } from '../lib/dates';
 import type { BackupData } from '../lib/backup';
 import type { WaistEntry } from '../lib/body';
 import type { Goal } from '../lib/goal';
+import type { Medicine, TakenDose } from '../lib/medicines';
+import { parseReminderSettings, type ReminderSettings } from '../lib/reminders';
 import type { LabReport, LabValues, TestKey } from '../lib/labs';
 import { parseProfile, type Profile } from '../lib/profile';
 
@@ -78,6 +80,30 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
         created_at TEXT NOT NULL
       );
       PRAGMA user_version = 4;
+    `);
+  }
+
+  if (version < 5) {
+    // times: JSON array of "HH:MM". A stopped medicine keeps its history.
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS medicines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        dose TEXT,
+        times TEXT NOT NULL,
+        remind INTEGER NOT NULL DEFAULT 1,
+        start_date TEXT NOT NULL,
+        stopped_date TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS medicine_doses (
+        medicine_id INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        taken_at TEXT NOT NULL,
+        PRIMARY KEY (medicine_id, date, time)
+      );
+      PRAGMA user_version = 5;
     `);
   }
 }
@@ -209,6 +235,114 @@ export async function saveProfile(db: SQLiteDatabase, profile: Profile): Promise
   await setValue(db, PROFILE_KEY, JSON.stringify(profile));
 }
 
+type MedicineRow = {
+  id: number;
+  name: string;
+  dose: string | null;
+  times: string;
+  remind: number;
+  start_date: string;
+  stopped_date: string | null;
+};
+
+const medicineFromRow = (r: MedicineRow): Medicine => ({
+  id: r.id,
+  name: r.name,
+  dose: r.dose,
+  times: JSON.parse(r.times) as string[],
+  remind: r.remind === 1,
+  startDate: fromISODate(r.start_date),
+  stoppedDate: r.stopped_date ? fromISODate(r.stopped_date) : null,
+});
+
+/** Current medicines first (by name), then stopped ones. */
+export async function listMedicines(db: SQLiteDatabase): Promise<Medicine[]> {
+  const rows = await db.getAllAsync<MedicineRow>(
+    'SELECT id, name, dose, times, remind, start_date, stopped_date FROM medicines ORDER BY stopped_date IS NOT NULL, name COLLATE NOCASE',
+  );
+  return rows.map(medicineFromRow);
+}
+
+export async function getMedicine(db: SQLiteDatabase, id: number): Promise<Medicine | null> {
+  const row = await db.getFirstAsync<MedicineRow>(
+    'SELECT id, name, dose, times, remind, start_date, stopped_date FROM medicines WHERE id = ?',
+    id,
+  );
+  return row ? medicineFromRow(row) : null;
+}
+
+/** Inserts when `id` is null, otherwise updates that medicine. */
+export async function saveMedicine(db: SQLiteDatabase, m: Omit<Medicine, 'id'> & { id: number | null }) {
+  const values = [
+    m.name.trim(),
+    m.dose?.trim() || null,
+    JSON.stringify([...m.times].sort()),
+    m.remind ? 1 : 0,
+    toISODate(m.startDate),
+    m.stoppedDate ? toISODate(m.stoppedDate) : null,
+  ] as const;
+  if (m.id === null) {
+    await db.runAsync(
+      'INSERT INTO medicines (name, dose, times, remind, start_date, stopped_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ...values,
+      new Date().toISOString(),
+    );
+  } else {
+    await db.runAsync(
+      'UPDATE medicines SET name = ?, dose = ?, times = ?, remind = ?, start_date = ?, stopped_date = ? WHERE id = ?',
+      ...values,
+      m.id,
+    );
+  }
+}
+
+export async function deleteMedicine(db: SQLiteDatabase, id: number): Promise<void> {
+  await db.withExclusiveTransactionAsync(async (tx) => {
+    await tx.runAsync('DELETE FROM medicine_doses WHERE medicine_id = ?', id);
+    await tx.runAsync('DELETE FROM medicines WHERE id = ?', id);
+  });
+}
+
+type DoseRow = { medicine_id: number; date: string; time: string };
+
+/** Doses taken on or after `from` ("YYYY-MM-DD"). */
+export async function listTakenDoses(db: SQLiteDatabase, from: string): Promise<TakenDose[]> {
+  const rows = await db.getAllAsync<DoseRow>(
+    'SELECT medicine_id, date, time FROM medicine_doses WHERE date >= ?',
+    from,
+  );
+  return rows.map((r) => ({ medicineId: r.medicine_id, date: r.date, time: r.time }));
+}
+
+export async function setDoseTaken(db: SQLiteDatabase, dose: TakenDose, taken: boolean): Promise<void> {
+  if (taken) {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO medicine_doses (medicine_id, date, time, taken_at) VALUES (?, ?, ?, ?)',
+      dose.medicineId,
+      dose.date,
+      dose.time,
+      new Date().toISOString(),
+    );
+  } else {
+    await db.runAsync(
+      'DELETE FROM medicine_doses WHERE medicine_id = ? AND date = ? AND time = ?',
+      dose.medicineId,
+      dose.date,
+      dose.time,
+    );
+  }
+}
+
+const REMINDERS_KEY = 'reminders';
+
+export async function getReminderSettings(db: SQLiteDatabase): Promise<ReminderSettings> {
+  return parseReminderSettings(await getValue(db, REMINDERS_KEY));
+}
+
+export async function saveReminderSettings(db: SQLiteDatabase, settings: ReminderSettings): Promise<void> {
+  await setValue(db, REMINDERS_KEY, JSON.stringify(settings));
+}
+
 /** Everything Sehat stores itself, for a backup file. */
 export async function readBackupData(db: SQLiteDatabase): Promise<BackupData> {
   const goals = await db.getAllAsync<GoalRow & { created_at: string }>(
@@ -225,6 +359,8 @@ export async function readBackupData(db: SQLiteDatabase): Promise<BackupData> {
     })),
     labReports: await listLabReports(db),
     waist: await listWaist(db),
+    medicines: await listMedicines(db),
+    doses: await listTakenDoses(db, '0000-00-00'),
     settings: Object.fromEntries(settings.map((s) => [s.key, s.value])),
   };
 }
@@ -232,7 +368,10 @@ export async function readBackupData(db: SQLiteDatabase): Promise<BackupData> {
 /** Replaces everything Sehat stores with the backup's contents, all or nothing. */
 export async function restoreBackupData(db: SQLiteDatabase, data: BackupData): Promise<void> {
   await db.withExclusiveTransactionAsync(async (tx) => {
-    await tx.execAsync('DELETE FROM goals; DELETE FROM lab_values; DELETE FROM lab_reports; DELETE FROM waist; DELETE FROM kv;');
+    await tx.execAsync(`
+      DELETE FROM goals; DELETE FROM lab_values; DELETE FROM lab_reports; DELETE FROM waist;
+      DELETE FROM medicine_doses; DELETE FROM medicines; DELETE FROM kv;
+    `);
     for (const g of data.goals) {
       await tx.runAsync(
         'INSERT INTO goals (start_date, start_kg, target_kg, target_date, created_at) VALUES (?, ?, ?, ?, ?)',
@@ -259,6 +398,32 @@ export async function restoreBackupData(db: SQLiteDatabase, data: BackupData): P
         'INSERT INTO waist (date, cm, created_at) VALUES (?, ?, ?)',
         toISODate(w.date),
         w.cm,
+        new Date().toISOString(),
+      );
+    }
+    // Medicines get new ids here, so their doses are re-linked through the backup's ids.
+    const newIds = new Map<number, number>();
+    for (const m of data.medicines) {
+      const { lastInsertRowId } = await tx.runAsync(
+        'INSERT INTO medicines (name, dose, times, remind, start_date, stopped_date, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        m.name,
+        m.dose,
+        JSON.stringify(m.times),
+        m.remind ? 1 : 0,
+        toISODate(m.startDate),
+        m.stoppedDate ? toISODate(m.stoppedDate) : null,
+        new Date().toISOString(),
+      );
+      newIds.set(m.id, lastInsertRowId);
+    }
+    for (const d of data.doses) {
+      const id = newIds.get(d.medicineId);
+      if (id === undefined) continue;
+      await tx.runAsync(
+        'INSERT OR IGNORE INTO medicine_doses (medicine_id, date, time, taken_at) VALUES (?, ?, ?, ?)',
+        id,
+        d.date,
+        d.time,
         new Date().toISOString(),
       );
     }

@@ -17,6 +17,7 @@ import {
   type LabValues,
   type TestKey,
 } from '../lib/labs';
+import { syncReminders } from '../notifications/reminders';
 import { colors, radius } from '../theme';
 
 type Texts = Partial<Record<TestKey, string>>;
@@ -72,6 +73,7 @@ export default function LabReportScreen() {
     setSaveError(null);
     try {
       await saveLabReport(db, { id, date, lab: lab.trim() || null, values });
+      await syncReminders(db).catch(() => {});
       router.back();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Could not save the report.');
@@ -87,6 +89,7 @@ export default function LabReportScreen() {
         style: 'destructive',
         onPress: async () => {
           await deleteLabReport(db, id!);
+          await syncReminders(db).catch(() => {});
           router.back();
         },
       },

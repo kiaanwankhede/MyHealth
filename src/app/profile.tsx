@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
@@ -13,6 +14,7 @@ import {
   type Profile,
   type Sex,
 } from '../lib/profile';
+import { syncReminders } from '../notifications/reminders';
 import { colors, radius } from '../theme';
 
 const toText = (n: number | null) => (n === null ? '' : String(n));
@@ -24,6 +26,7 @@ const RISK_OPTIONS = (Object.keys(HEART_RISK_LABELS) as HeartRisk[]).map((value)
 }));
 
 export default function ProfileScreen() {
+  const db = useSQLiteContext();
   const { profile, save } = useProfile();
   const [height, setHeight] = useState(toText(profile.heightCm));
   const [birthYear, setBirthYear] = useState(toText(profile.birthYear));
@@ -45,6 +48,8 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       await save({ ...next, birthYear: next.birthYear === null ? null : Math.round(next.birthYear) });
+      // The evening walk reminder mentions the step goal.
+      await syncReminders(db).catch(() => {});
       router.back();
     } finally {
       setSaving(false);

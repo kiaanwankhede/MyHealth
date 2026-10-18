@@ -90,6 +90,45 @@ export function DateField({ label, value, onChange, minimumDate, maximumDate }: 
   );
 }
 
+type TimeChipsProps = { label: string; times: string[]; onChange: (times: string[]) => void };
+
+/** A list of times of day ("08:00"), each removable, plus a button that opens the clock to add one. */
+export function TimeChips({ label, times, onChange }: TimeChipsProps) {
+  const add = () =>
+    DateTimePickerAndroid.open({
+      value: new Date(2026, 0, 1, 8, 0),
+      mode: 'time',
+      is24Hour: true,
+      onChange: (event, date) => {
+        if (event.type !== 'set' || !date) return;
+        const t = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+        if (!times.includes(t)) onChange([...times, t].sort());
+      },
+    });
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.choices}>
+        {times.map((t) => (
+          <Pressable
+            key={t}
+            style={[styles.choice, styles.choiceSelected]}
+            onPress={() => onChange(times.filter((x) => x !== t))}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${t}`}
+          >
+            <Text style={[styles.choiceText, styles.choiceTextSelected]}>{t} ✕</Text>
+          </Pressable>
+        ))}
+        <Pressable style={styles.choice} onPress={add} accessibilityRole="button">
+          <Text style={styles.choiceText}>+ Add time</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 type ChoiceFieldProps<T extends string> = {
   label: string;
   value: T | null;
