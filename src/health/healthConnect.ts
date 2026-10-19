@@ -72,13 +72,19 @@ export { openHealthConnectSettings };
  * Health Connect de-duplicates overlapping sources (e.g. Google Fit and a watch).
  */
 export async function readStepsToday(now: Date = new Date()): Promise<number> {
+  return readStepsBetween(startOfLocalDay(now), now);
+}
+
+/** Steps yesterday from midnight up to this time of day, to compare today with fairly. */
+export async function readStepsYesterdaySoFar(now: Date = new Date()): Promise<number> {
+  const sameTime = addDays(now, -1);
+  return readStepsBetween(startOfLocalDay(sameTime), sameTime);
+}
+
+async function readStepsBetween(start: Date, end: Date): Promise<number> {
   const result = await aggregateRecord({
     recordType: 'Steps',
-    timeRangeFilter: {
-      operator: 'between',
-      startTime: startOfLocalDay(now).toISOString(),
-      endTime: now.toISOString(),
-    },
+    timeRangeFilter: { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() },
   });
   return result.COUNT_TOTAL ?? 0;
 }

@@ -22,3 +22,20 @@ export function parseDecimal(text: string): number {
   if (!/^\d+(\.\d+)?$/.test(cleaned)) return Number.NaN;
   return Number(cleaned);
 }
+
+/**
+ * A change as shown next to a stat: "+820", "−1,240" or "±0" when it rounds to nothing, and
+ * whether it is good news (null when neither direction is better, or there was no change).
+ */
+export function describeDelta(
+  value: number,
+  format: (abs: number) => string,
+  better: 'up' | 'down' | null,
+): { text: string; good: boolean | null } {
+  const abs = format(Math.abs(value));
+  if (!/[1-9]/.test(abs)) return { text: `±${abs}`, good: null };
+  return {
+    text: `${value > 0 ? '+' : '−'}${abs}`,
+    good: better === null ? null : value > 0 === (better === 'up'),
+  };
+}

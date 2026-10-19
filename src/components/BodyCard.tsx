@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useProfile } from '../db/profile';
@@ -11,19 +12,26 @@ import {
   healthyWeightRange,
   waistToHeight,
 } from '../lib/body';
-import { formatDate } from '../lib/dates';
+import { addDays, formatDate } from '../lib/dates';
+import type { TrendPoint } from '../lib/goal';
 import type { Classification } from '../lib/labs';
+import { trendOn } from '../lib/review';
+import { Delta } from './Delta';
 import { formatKg } from '../lib/format';
 import { colors, radius, toneColors } from '../theme';
 
 /** BMI, waist and waist-to-height with Asian Indian cut-offs, on the Weight tab. */
-export function BodyCard({ trendKg }: { trendKg: number | null }) {
+export function BodyCard({ series }: { series: readonly TrendPoint[] }) {
   const { profile } = useProfile();
   const { entries } = useWaist();
   const height = profile.heightCm;
   const waist = entries?.[0] ?? null;
+  const previousWaist = entries?.[1] ?? null;
+  const trendKg = series.length ? series[series.length - 1].trend : null;
+  const monthAgoKg = trendOn(series, addDays(new Date(), -30));
 
   const value = height !== null && trendKg !== null ? bmi(trendKg, height) : null;
+  const bmiChange = value !== null && monthAgoKg !== null ? value - bmi(monthAgoKg, height!) : null;
   const range = height !== null ? healthyWeightRange(height) : null;
   const waistStatus = waist ? classifyWaist(waist.cm, profile.sex) : null;
   const ratio = waist && height !== null ? waistToHeight(waist.cm, height) : null;
@@ -48,6 +56,7 @@ export function BodyCard({ trendKg }: { trendKg: number | null }) {
             label="BMI (from trend)"
             value={value === null ? '–' : value.toFixed(1)}
             status={value === null ? null : classifyBmi(value)}
+            delta={<Delta value={bmiChange} format={(v) => v.toFixed(1)} better="down" suffix="in 30 days" />}
           />
           {range && (
             <Text style={styles.muted}>
@@ -90,14 +99,19 @@ export function BodyCard({ trendKg }: { trendKg: number | null }) {
   );
 }
 
-function Row({ label, value, status }: { label: string; value: string; status: Classification | null }) {
+type RowProps = { label: string; value: string; status: Classification | null; delta?: ReactNode };
+
+function Row({ label, value, status, delta }: RowProps) {
   return (
     <View style={styles.row}>
       <View style={{ flex: 1 }}>
         <Text style={styles.rowLabel}>{label}</Text>
         {status && <Text style={[styles.status, { color: toneColors[status.tone] }]}>{status.label}</Text>}
       </View>
-      <Text style={styles.value}>{value}</Text>
+      <View style={styles.right}>
+        <Text style={styles.value}>{value}</Text>
+        {delta}
+      </View>
     </View>
   );
 }
@@ -113,6 +127,7 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 15, color: colors.muted },
   status: { fontSize: 15, fontWeight: '600', marginTop: 2 },
   value: { fontSize: 22, fontWeight: '700', color: colors.ink },
+  right: { alignItems: 'flex-end' },
   muted: { fontSize: 15, lineHeight: 21, color: colors.muted },
   link: { fontSize: 15, fontWeight: '600', color: colors.teal },
   note: { fontSize: 13, lineHeight: 18, color: colors.muted },

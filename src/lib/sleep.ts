@@ -61,10 +61,16 @@ export function nights(sessions: readonly SleepSession[]): Night[] {
 
 export type SleepSummary = { last: Night | null; averageMinutes: number | null; nights: number };
 
-/** Last night (if it was within the last day) and the average over the past `days` mornings. */
+/**
+ * Last night (if it was within the last day) and the average over the `days` mornings up to
+ * `now`. Pass an earlier `now` to get the same figures for an earlier week.
+ */
 export function sleepSummary(all: readonly Night[], now: Date, days = 7): SleepSummary {
-  const recent = all.filter((n) => calendarDaysBetween(n.date, now) < days);
-  const last = all[0] && calendarDaysBetween(all[0].date, now) <= 1 ? all[0] : null;
+  const recent = all.filter((n) => {
+    const ago = calendarDaysBetween(n.date, now);
+    return ago >= 0 && ago < days;
+  });
+  const last = recent[0] && calendarDaysBetween(recent[0].date, now) <= 1 ? recent[0] : null;
   return {
     last,
     averageMinutes: recent.length
@@ -84,11 +90,11 @@ export function formatDuration(minutes: number): string {
 export type HeartReading = { time: Date; bpm: number };
 export type HeartSummary = { latest: HeartReading | null; average: number | null };
 
-/** Latest resting heart rate and the average over the past `days` days. */
+/** Latest resting heart rate and the average over the `days` days up to `now`. */
 export function restingHeartSummary(readings: readonly HeartReading[], now: Date, days = 7): HeartSummary {
   const since = addDays(startOfLocalDay(now), -(days - 1));
-  const recent = readings.filter((r) => r.time >= since);
-  const latest = [...readings].sort((a, b) => b.time.getTime() - a.time.getTime())[0] ?? null;
+  const recent = readings.filter((r) => r.time >= since && r.time <= now);
+  const latest = [...recent].sort((a, b) => b.time.getTime() - a.time.getTime())[0] ?? null;
   return {
     latest,
     average: recent.length ? Math.round(recent.reduce((s, r) => s + r.bpm, 0) / recent.length) : null,

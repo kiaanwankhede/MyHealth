@@ -1,7 +1,7 @@
 // The weekly look-back on Today, and plateau detection. Pure functions only.
 
 import { addDays, calendarDaysBetween, startOfLocalDay } from './dates';
-import type { TrendPoint } from './goal';
+import { goalProgress, type Goal, type GoalProgress, type TrendPoint } from './goal';
 import { retestsDue, type LabReport, type RetestDate } from './labs';
 import type { DailySteps } from './steps';
 
@@ -13,6 +13,22 @@ export function trendOn(series: readonly TrendPoint[], date: Date): number | nul
     found = p.trend;
   }
   return found;
+}
+
+/** Goal progress as it stood on an earlier date, for "this week" changes. */
+export function goalProgressOn(goal: Goal, series: readonly TrendPoint[], date: Date): GoalProgress | null {
+  return goalProgress(
+    goal,
+    series.filter((p) => calendarDaysBetween(p.date, date) >= 0),
+    date,
+  );
+}
+
+/** Trend now minus the trend a week before the latest weigh-in's day; null without that history. */
+export function trendChangeOverWeek(series: readonly TrendPoint[], now: Date): number | null {
+  if (series.length === 0) return null;
+  const weekAgo = trendOn(series, addDays(startOfLocalDay(now), -7));
+  return weekAgo === null ? null : series[series.length - 1].trend - weekAgo;
 }
 
 export type WeeklyReview = {
@@ -33,15 +49,13 @@ export function weeklyReview(args: {
 }): WeeklyReview {
   const { series, steps, stepGoal, reports, now } = args;
   const today = startOfLocalDay(now);
-  const weekAgo = trendOn(series, addDays(today, -7));
-  const current = series.length ? series[series.length - 1].trend : null;
 
   const week = steps.filter((d) => {
     const ago = calendarDaysBetween(d.date, today);
     return ago >= 1 && ago <= 7;
   });
   return {
-    trendChangeKg: weekAgo !== null && current !== null ? current - weekAgo : null,
+    trendChangeKg: trendChangeOverWeek(series, now),
     stepsAverage: week.length ? Math.round(week.reduce((s, d) => s + d.steps, 0) / week.length) : null,
     goalDays: week.filter((d) => d.steps >= stepGoal).length,
     labsDue: retestsDue(reports, now),

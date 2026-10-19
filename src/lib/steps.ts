@@ -32,6 +32,47 @@ export function stepStats(days: readonly DailySteps[], goal: number): StepStats 
   };
 }
 
+export type PeriodComparison = {
+  /** The last `n` complete days (today is still going, so it is left out). */
+  current: StepStats;
+  /** The `n` days before those; null when there is no data for them. */
+  previous: StepStats | null;
+};
+
+/** `days` is oldest first and ends with today. Compares the last `n` full days with the `n` before. */
+export function comparePeriods(days: readonly DailySteps[], n: number, goal: number): PeriodComparison {
+  const complete = days.slice(0, -1);
+  const current = complete.slice(-n);
+  const before = complete.slice(-2 * n, -n);
+  const hasData = before.length === n && before.some((d) => d.steps > 0);
+  return { current: stepStats(current, goal), previous: hasData ? stepStats(before, goal) : null };
+}
+
+/** How a year's numbers moved over the last week: `now` minus the same figures a week ago. */
+export type YearChange = {
+  total: number;
+  average: number;
+  goalDays: number;
+  distanceKm: number;
+  longestStreak: number;
+  /** True when the best day of the year happened in the last 7 days. */
+  newBest: boolean;
+};
+
+export function yearChange(days: readonly DailySteps[], goal: number): YearChange | null {
+  const now = yearInsights(days, goal);
+  const weekAgo = yearInsights(days.slice(0, -7), goal);
+  if (!now || !weekAgo) return null;
+  return {
+    total: now.total - weekAgo.total,
+    average: now.average - weekAgo.average,
+    goalDays: now.goalDays - weekAgo.goalDays,
+    distanceKm: now.distanceKm - weekAgo.distanceKm,
+    longestStreak: now.longestStreak.days - weekAgo.longestStreak.days,
+    newBest: now.best.steps > weekAgo.best.steps,
+  };
+}
+
 /**
  * Retro goal: once today's goal is met, keep extending the window backwards one day at a
  * time while the combined steps still reach goal × days. The first window that falls short

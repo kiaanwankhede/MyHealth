@@ -1,4 +1,4 @@
-import { formatCount, formatKg, parseDecimal, percentOfGoal } from '../format';
+import { describeDelta, formatCount, formatKg, parseDecimal, percentOfGoal } from '../format';
 
 describe('formatCount', () => {
   it.each([
@@ -42,5 +42,19 @@ describe('parseDecimal', () => {
     expect(parseDecimal('82.')).toBeNaN();
     expect(parseDecimal('8a')).toBeNaN();
     expect(parseDecimal('-3')).toBeNaN();
+  });
+});
+
+describe('describeDelta', () => {
+  it('signs the change and says whether it is good news', () => {
+    expect(describeDelta(820, formatCount, 'up')).toEqual({ text: '+820', good: true });
+    expect(describeDelta(-1240, formatCount, 'up')).toEqual({ text: '−1,240', good: false });
+    expect(describeDelta(-0.4, (v) => `${v.toFixed(1)} kg`, 'down')).toEqual({ text: '−0.4 kg', good: true });
+    expect(describeDelta(3, String, null)).toEqual({ text: '+3', good: null });
+  });
+
+  it('shows ±0 when the change rounds to nothing', () => {
+    expect(describeDelta(0.02, (v) => `${v.toFixed(1)} kg`, 'down')).toEqual({ text: '±0.0 kg', good: null });
+    expect(describeDelta(0, String, 'up')).toEqual({ text: '±0', good: null });
   });
 });

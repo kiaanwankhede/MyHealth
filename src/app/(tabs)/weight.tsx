@@ -1,21 +1,27 @@
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BodyCard } from '../../components/BodyCard';
 import { ConnectCard } from '../../components/ConnectCard';
+import { Delta } from '../../components/Delta';
 import { PlateauCard } from '../../components/PlateauCard';
 import { WeightChart } from '../../components/WeightChart';
 import { useWeightGoal } from '../../health/useWeightGoal';
-import { formatDate, formatDayMonth, formatRelativeDay } from '../../lib/dates';
+import { addDays, calendarDaysBetween, formatDate, formatDayMonth, formatRelativeDay } from '../../lib/dates';
 import { formatKg } from '../../lib/format';
 import { describeStatus } from '../../lib/goal';
-import { detectPlateau } from '../../lib/review';
+import { detectPlateau, goalProgressOn, trendChangeOverWeek } from '../../lib/review';
 import { colors, radius } from '../../theme';
 
 export default function WeightScreen() {
   const { status, goal, series, progress, latest, fullAccess, error, connect } = useWeightGoal();
   const today = new Date();
+  // Losing is the usual goal; with a gain goal (or none set), a rising trend isn't bad news.
+  const losing = !goal || goal.targetKg < goal.startKg;
+  const weekAgo = goal ? goalProgressOn(goal, series, addDays(today, -7)) : null;
+  const kg = (v: number) => `${formatKg(v)} kg`;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -23,7 +29,11 @@ export default function WeightScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Weight</Text>
           {status === 'ready' && (
-            <Pressable style={styles.pill} onPress={() => router.push('/log-weight')} accessibilityRole="button">
+            <Pressable
+              style={styles.pill}
+              onPress={() => router.push('/log-weight')}
+              accessibilityRole="button"
+            >
               <Text style={styles.pillText}>+ Log</Text>
             </Pressable>
           )}
@@ -50,26 +60,82 @@ export default function WeightScreen() {
                 <Text style={styles.muted}>
                   kg · {formatRelativeDay(latest.date, today).toLowerCase()} · trend {formatKg(latest.trend)}
                 </Text>
+                <Delta
+                  value={trendChangeOverWeek(series, today)}
+                  format={kg}
+                  better={losing ? 'down' : 'up'}
+                  suffix="trend this week"
+                />
               </View>
             ) : (
               <Text style={styles.muted}>No weigh-ins in Health Connect yet. Tap “+ Log” to add one.</Text>
             )}
 
-            {series.length > 0 && <WeightChart series={series} goal={goal} progress={progress} today={today} />}
+            {series.length > 0 && (
+              <WeightChart series={series} goal={goal} progress={progress} today={today} />
+            )}
 
             {goal && progress && (
               <>
                 <StatusPill text={describeStatus(progress).text} tone={describeStatus(progress).tone} />
                 <View style={styles.grid}>
-                  <Stat label="Lost" value={`${formatKg(Math.max(0, progress.lostKg))} kg`} />
-                  <Stat label="To go" value={`${formatKg(progress.toGoKg)} kg`} />
+                  <Stat
+                    label="Lost"
+                    value={`${formatKg(Math.max(0, progress.lostKg))} kg`}
+                    delta={
+                      weekAgo && (
+                        <Delta
+                          value={progress.lostKg - weekAgo.lostKg}
+                          format={kg}
+                          better="up"
+                          suffix="this week"
+                        />
+                      )
+                    }
+                  />
+                  <Stat
+                    label="To go"
+                    value={`${formatKg(progress.toGoKg)} kg`}
+                    delta={
+                      weekAgo && (
+                        <Delta
+                          value={progress.toGoKg - weekAgo.toGoKg}
+                          format={kg}
+                          better="down"
+                          suffix="this week"
+                        />
+                      )
+                    }
+                  />
                   <Stat
                     label="Pace kg/week"
                     value={progress.paceKgPerWeek === null ? '–' : progress.paceKgPerWeek.toFixed(2)}
+                    delta={
+                      progress.paceKgPerWeek !== null &&
+                      weekAgo?.paceKgPerWeek != null && (
+                        <Delta
+                          value={progress.paceKgPerWeek - weekAgo.paceKgPerWeek}
+                          format={(v) => v.toFixed(2)}
+                          better="up"
+                          suffix="this week"
+                        />
+                      )
+                    }
                   />
                   <Stat
                     label="Finish"
                     value={progress.projectedFinish ? formatDayMonth(progress.projectedFinish) : '–'}
+                    delta={
+                      progress.projectedFinish &&
+                      weekAgo?.projectedFinish && (
+                        <Delta
+                          value={calendarDaysBetween(weekAgo.projectedFinish, progress.projectedFinish)}
+                          format={(d) => `${d} ${d === 1 ? 'day' : 'days'}`}
+                          better="down"
+                          suffix="this week"
+                        />
+                      )
+                    }
                   />
                 </View>
                 {progress.paceKgPerWeek === null && (
@@ -80,7 +146,11 @@ export default function WeightScreen() {
             )}
 
             {goal ? (
-              <Pressable style={styles.goalRow} onPress={() => router.push('/goal')} accessibilityRole="button">
+              <Pressable
+                style={styles.goalRow}
+                onPress={() => router.push('/goal')}
+                accessibilityRole="button"
+              >
                 <Text style={styles.goalText}>
                   Goal: {formatKg(goal.targetKg)} kg by {formatDate(goal.targetDate)}
                 </Text>
@@ -93,7 +163,11 @@ export default function WeightScreen() {
                   Pick a target weight and date. Sehat works out the pace you need and tells you every day if
                   you’re ahead or behind.
                 </Text>
-                <Pressable style={styles.button} onPress={() => router.push('/goal')} accessibilityRole="button">
+                <Pressable
+                  style={styles.button}
+                  onPress={() => router.push('/goal')}
+                  accessibilityRole="button"
+                >
                   <Text style={styles.buttonText}>Set goal</Text>
                 </Pressable>
               </View>
@@ -101,17 +175,18 @@ export default function WeightScreen() {
           </>
         )}
 
-        <BodyCard trendKg={latest?.trend ?? null} />
+        <BodyCard series={series} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, delta }: { label: string; value: string; delta?: ReactNode }) {
   return (
     <View style={styles.stat}>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
+      {delta}
     </View>
   );
 }
@@ -139,7 +214,13 @@ const styles = StyleSheet.create({
   status: { borderRadius: radius.pill, paddingHorizontal: 16, paddingVertical: 10 },
   statusText: { fontSize: 16, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  stat: { flexBasis: '47%', flexGrow: 1, backgroundColor: colors.card, borderRadius: radius.pill, padding: 12 },
+  stat: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    padding: 12,
+  },
   statLabel: { fontSize: 14, color: colors.muted },
   statValue: { fontSize: 20, fontWeight: '700', color: colors.ink, marginTop: 2 },
   note: { fontSize: 14, color: colors.muted },
@@ -157,6 +238,11 @@ const styles = StyleSheet.create({
   accessText: { fontSize: 15, lineHeight: 21, color: '#8A3A0E' },
   cta: { backgroundColor: colors.tealSoft, borderRadius: radius.card, padding: 20, gap: 10 },
   ctaTitle: { fontSize: 20, fontWeight: '600', color: colors.ink },
-  button: { backgroundColor: colors.teal, borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center' },
+  button: {
+    backgroundColor: colors.teal,
+    borderRadius: radius.pill,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   buttonText: { color: colors.surface, fontSize: 16, fontWeight: '600' },
 });

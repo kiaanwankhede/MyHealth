@@ -1,8 +1,17 @@
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectCard } from '../../components/ConnectCard';
+import { Delta } from '../../components/Delta';
 import { RetroGoalCard } from '../../components/RetroGoalCard';
 import { StepsBarChart } from '../../components/StepsBarChart';
 import { YearInsights } from '../../components/YearInsights';
@@ -12,23 +21,36 @@ import { useSteps } from '../../health/useSteps';
 import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayMonth } from '../../lib/dates';
 import { formatCount } from '../../lib/format';
-import { distanceKm, kcalFromSteps, retroGoal, stepStats, yearInsights } from '../../lib/steps';
+import {
+  comparePeriods,
+  distanceKm,
+  kcalFromSteps,
+  retroGoal,
+  yearChange,
+  yearInsights,
+} from '../../lib/steps';
 import { colors, radius } from '../../theme';
 
 type Range = 7 | 30;
 
 export default function StepsScreen() {
-  const { status, days, fullAccess, error, reload } = useSteps();
+  const { status, days, fullAccess, yesterdaySoFar, error, reload } = useSteps();
   const { latest } = useWeightGoal();
   const [range, setRange] = useState<Range>(7);
   const { stepGoal } = useProfile().profile;
 
   const today = days.length ? days[days.length - 1].steps : 0;
   const shown = days.slice(-range);
-  const stats = stepStats(shown, stepGoal);
-  const retro = retroGoal([...days].reverse().map((d) => d.steps), stepGoal);
+  const { current: stats, previous } = comparePeriods(days, range, stepGoal);
+  const vsYesterday = yesterdaySoFar === null || days.length < 2 ? null : today - yesterdaySoFar;
+  const weightKg = latest?.trend;
+  const retro = retroGoal(
+    [...days].reverse().map((d) => d.steps),
+    stepGoal,
+  );
   const toGo = Math.max(0, stepGoal - today);
   const year = yearInsights(days, stepGoal);
+  const yearDelta = yearChange(days, stepGoal);
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
@@ -55,10 +77,10 @@ export default function StepsScreen() {
             <View style={styles.bigRow}>
               <Text style={styles.big}>{formatCount(today)}</Text>
               <Text style={styles.muted}>today</Text>
+              <Delta value={vsYesterday} format={formatCount} better="up" suffix="vs this time yesterday" />
             </View>
             <Text style={styles.goalLine}>
-              Goal {formatCount(stepGoal)} ·{' '}
-              {toGo > 0 ? `${formatCount(toGo)} to go` : 'done for today'}
+              Goal {formatCount(stepGoal)} · {toGo > 0 ? `${formatCount(toGo)} to go` : 'done for today'}
             </Text>
 
             <RetroGoalCard retro={retro} />
@@ -72,7 +94,9 @@ export default function StepsScreen() {
                 }}
                 accessibilityRole="button"
               >
-                <Text style={styles.accessText}>Allow past-data access to include all your steps since 1 January.</Text>
+                <Text style={styles.accessText}>
+                  Allow past-data access to include all your steps since 1 January.
+                </Text>
                 <Text style={styles.link}>Allow access</Text>
               </Pressable>
             )}
@@ -96,22 +120,70 @@ export default function StepsScreen() {
             <StepsBarChart days={shown} goal={stepGoal} />
 
             <View style={styles.list}>
-              <Row label={`${range}-day average`} value={formatCount(stats.average)} />
-              <Row label="Goal days" value={`${stats.goalDays} of ${shown.length}`} />
+              <Row
+                label={`${range}-day average`}
+                value={formatCount(stats.average)}
+                delta={
+                  <Delta
+                    value={previous && stats.average - previous.average}
+                    format={formatCount}
+                    better="up"
+                  />
+                }
+              />
+              <Row
+                label="Goal days"
+                value={`${stats.goalDays} of ${range}`}
+                delta={
+                  <Delta value={previous && stats.goalDays - previous.goalDays} format={String} better="up" />
+                }
+              />
               {stats.best && stats.best.steps > 0 && (
                 <Row
                   label="Best day"
                   value={`${formatCount(stats.best.steps)} · ${formatDayMonth(stats.best.date)}`}
+                  delta={
+                    <Delta
+                      value={previous?.best ? stats.best.steps - previous.best.steps : null}
+                      format={formatCount}
+                      better="up"
+                    />
+                  }
                 />
               )}
-              <Row label="Distance today" value={`≈ ${distanceKm(today).toFixed(1)} km`} />
-              <Row label="Burned from steps" value={`≈ ${formatCount(kcalFromSteps(today, latest?.trend))} kcal`} />
+              <Row
+                label="Distance today"
+                value={`≈ ${distanceKm(today).toFixed(1)} km`}
+                delta={
+                  <Delta
+                    value={vsYesterday === null ? null : distanceKm(vsYesterday)}
+                    format={(km) => `${km.toFixed(1)} km`}
+                    better="up"
+                  />
+                }
+              />
+              <Row
+                label="Burned from steps"
+                value={`≈ ${formatCount(kcalFromSteps(today, weightKg))} kcal`}
+                delta={
+                  <Delta
+                    value={vsYesterday === null ? null : kcalFromSteps(vsYesterday, weightKg)}
+                    format={formatCount}
+                    better="up"
+                  />
+                }
+              />
             </View>
-            <Text style={styles.note}>Distance and calories are estimates from your step count.</Text>
+            <Text style={styles.note}>
+              Average, goal days and best day count full days (today is still going) and are compared with the{' '}
+              {range} days before. Today’s numbers are compared with this time yesterday. Distance and
+              calories are estimates from your step count.
+            </Text>
 
             {year && (
               <YearInsights
                 insights={year}
+                change={yearDelta}
                 goal={stepGoal}
                 year={new Date().getFullYear()}
                 fullAccess={fullAccess}
@@ -124,11 +196,14 @@ export default function StepsScreen() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, delta }: { label: string; value: string; delta?: ReactNode }) {
   return (
     <View style={styles.row}>
       <Text style={styles.muted}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+      <View style={styles.rowRight}>
+        <Text style={styles.value}>{value}</Text>
+        {delta}
+      </View>
     </View>
   );
 }
@@ -138,7 +213,7 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 14 },
   title: { fontSize: 28, fontWeight: '700', color: colors.ink },
   error: { fontSize: 16, color: colors.orangeDark },
-  bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
   big: { fontSize: 44, fontWeight: '700', color: colors.ink },
   muted: { fontSize: 16, color: colors.muted },
   goalLine: { fontSize: 16, fontWeight: '600', color: colors.orangeDark },
@@ -151,11 +226,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   value: { fontSize: 16, fontWeight: '600', color: colors.ink },
+  rowRight: { alignItems: 'flex-end' },
   note: { fontSize: 13, color: colors.muted },
   access: { backgroundColor: colors.orangeSoft, borderRadius: radius.pill, padding: 14, gap: 6 },
   accessText: { fontSize: 15, lineHeight: 21, color: '#8A3A0E' },

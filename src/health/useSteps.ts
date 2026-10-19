@@ -8,6 +8,7 @@ import {
   getHealthConnectStatus,
   hasFullAccess,
   readDailySteps,
+  readStepsYesterdaySoFar,
   type HealthConnectStatus,
 } from './healthConnect';
 
@@ -16,27 +17,36 @@ type State = {
   days: DailySteps[];
   /** False without past-data access: Health Connect then hides steps older than ~30 days before access was granted. */
   fullAccess: boolean;
+  /** Steps yesterday up to this time of day, for "vs this time yesterday". */
+  yesterdaySoFar: number | null;
   error: string | null;
 };
 
 /** Daily step totals from 1 January this year to today (oldest first, today last). */
 export function useSteps() {
-  const [state, setState] = useState<State>({ status: 'loading', days: [], fullAccess: true, error: null });
+  const [state, setState] = useState<State>({
+    status: 'loading',
+    days: [],
+    fullAccess: true,
+    yesterdaySoFar: null,
+    error: null,
+  });
 
   const load = useCallback(async () => {
     try {
       const status = await getHealthConnectStatus();
       if (status !== 'ready') {
-        setState({ status, days: [], fullAccess: true, error: null });
+        setState({ status, days: [], fullAccess: true, yesterdaySoFar: null, error: null });
         return;
       }
       const now = new Date();
       const jan1 = new Date(now.getFullYear(), 0, 1);
-      const [days, fullAccess] = await Promise.all([
+      const [days, fullAccess, yesterdaySoFar] = await Promise.all([
         readDailySteps(calendarDaysBetween(jan1, now) + 1, now),
         hasFullAccess(),
+        readStepsYesterdaySoFar(now),
       ]);
-      setState({ status, days, fullAccess, error: null });
+      setState({ status, days, fullAccess, yesterdaySoFar, error: null });
     } catch (e) {
       setState((s) => ({ ...s, error: e instanceof Error ? e.message : 'Could not read your steps.' }));
     }

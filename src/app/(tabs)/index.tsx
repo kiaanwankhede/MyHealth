@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConnectCard } from '../../components/ConnectCard';
+import { Delta } from '../../components/Delta';
 import { DoseList } from '../../components/DoseList';
 import { PlateauCard } from '../../components/PlateauCard';
 import { SleepHeartCard } from '../../components/SleepHeartCard';
@@ -133,10 +134,20 @@ export default function TodayScreen() {
             >
               <View style={styles.row}>
                 <StepsRing percent={stepsPercent} />
-                <View>
+                <View style={styles.shrink}>
                   <Text style={styles.bigNumber}>{formatCount(steps ?? 0)}</Text>
                   <Text style={styles.muted}>of {formatCount(stepGoal)} steps</Text>
                   <Text style={styles.stepsPercent}>{stepsPercent}% of goal</Text>
+                  <Delta
+                    value={
+                      steps !== null && stepHistory.yesterdaySoFar !== null
+                        ? steps - stepHistory.yesterdaySoFar
+                        : null
+                    }
+                    format={formatCount}
+                    better="up"
+                    suffix="vs this time yesterday"
+                  />
                 </View>
               </View>
               {retro.state !== 'today' && <Text style={styles.retro}>{describeRetro(retro)}</Text>}
@@ -162,7 +173,12 @@ export default function TodayScreen() {
 
             <GoalCard {...weightGoal} />
             {plateau && <PlateauCard />}
-            <SleepHeartCard sleep={watch.sleep} heart={watch.heart} />
+            <SleepHeartCard
+              sleep={watch.sleep}
+              heart={watch.heart}
+              sleepWeekBefore={watch.sleepWeekBefore}
+              heartWeekBefore={watch.heartWeekBefore}
+            />
             {meds.today.length > 0 && (
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>
@@ -255,6 +271,7 @@ const styles = StyleSheet.create({
   stepsPercent: { fontSize: 16, fontWeight: '600', color: colors.orangeDark },
   trend: { fontSize: 16, fontWeight: '600', color: colors.teal },
   stepsCard: { gap: 12 },
+  shrink: { flexShrink: 1 },
   cardTitle: { fontSize: 17, fontWeight: '700', color: colors.ink },
   retro: { fontSize: 15, fontWeight: '600', color: colors.orangeDark },
   ldlStatus: { fontSize: 15, fontWeight: '600' },

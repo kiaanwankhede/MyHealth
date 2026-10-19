@@ -5,6 +5,8 @@ import {
   retroGoal,
   stepStats,
   yearInsights,
+  comparePeriods,
+  yearChange,
   type DailySteps,
 } from '../steps';
 
@@ -120,5 +122,42 @@ describe('yearInsights', () => {
 
   it('is null without any steps', () => {
     expect(yearInsights([{ date: new Date(2026, 0, 1), steps: 0 }], GOAL)).toBeNull();
+  });
+});
+
+describe('comparePeriods', () => {
+  const series = (values: number[]) =>
+    values.map((steps, i) => ({ date: new Date(2026, 9, 1 + i), steps }));
+
+  it('compares the last n full days with the n before, leaving out today', () => {
+    // 7 days at 8,000, then 7 at 10,000, then today (partial).
+    const days = series([...Array(7).fill(8000), ...Array(7).fill(10_000), 1200]);
+    const { current, previous } = comparePeriods(days, 7, 9000);
+    expect(current.average).toBe(10_000);
+    expect(current.goalDays).toBe(7);
+    expect(previous?.average).toBe(8000);
+    expect(previous?.goalDays).toBe(0);
+  });
+
+  it('has no previous period without data for it', () => {
+    const days = series([...Array(7).fill(0), ...Array(7).fill(10_000), 1200]);
+    expect(comparePeriods(days, 7, 9000).previous).toBeNull();
+    expect(comparePeriods(series([5000, 6000, 100]), 7, 9000).previous).toBeNull();
+  });
+});
+
+describe('yearChange', () => {
+  it('reports how the year’s numbers moved over the last week', () => {
+    const days = Array.from({ length: 30 }, (_, i) => ({
+      date: new Date(2026, 8, 1 + i),
+      steps: i >= 23 ? 12_000 : 8000,
+    }));
+    const change = yearChange(days, 10_000)!;
+    expect(change.total).toBe(7 * 12_000);
+    expect(change.goalDays).toBe(6); // the last 7 days, minus today which is still going
+    expect(change.average).toBeGreaterThan(0);
+    expect(change.newBest).toBe(true);
+    expect(change.longestStreak).toBe(7);
+    expect(change.distanceKm).toBeCloseTo(distanceKm(7 * 12_000));
   });
 });

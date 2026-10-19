@@ -1,13 +1,21 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { formatDuration, type HeartSummary, type SleepSummary } from '../lib/sleep';
+import { Delta } from './Delta';
 import { colors, radius } from '../theme';
 
 const time = (d: Date) =>
   `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
 /** Sleep and resting heart rate from the watch. Renders nothing when there is no data. */
-export function SleepHeartCard({ sleep, heart }: { sleep: SleepSummary | null; heart: HeartSummary | null }) {
+type Props = {
+  sleep: SleepSummary | null;
+  heart: HeartSummary | null;
+  sleepWeekBefore: SleepSummary | null;
+  heartWeekBefore: HeartSummary | null;
+};
+
+export function SleepHeartCard({ sleep, heart, sleepWeekBefore, heartWeekBefore }: Props) {
   const hasSleep = sleep !== null && sleep.nights > 0;
   const hasHeart = heart?.latest != null;
   if (!hasSleep && !hasHeart) return null;
@@ -34,6 +42,17 @@ export function SleepHeartCard({ sleep, heart }: { sleep: SleepSummary | null; h
           <Text style={styles.label}>Resting heart rate</Text>
           <Text style={styles.value}>{heart!.latest!.bpm} bpm</Text>
           {heart!.average !== null && <Text style={styles.sub}>7-day avg {heart!.average} bpm</Text>}
+          <Delta
+            value={
+              heart!.average !== null && heartWeekBefore?.average != null
+                ? heart!.average - heartWeekBefore.average
+                : null
+            }
+            format={(b) => `${b} bpm`}
+            better="down"
+            suffix="vs last week"
+            style={styles.delta}
+          />
         </View>
       )}
     </View>
@@ -52,4 +71,5 @@ const styles = StyleSheet.create({
   label: { fontSize: 15, color: colors.muted },
   value: { fontSize: 22, fontWeight: '700', color: colors.ink },
   sub: { fontSize: 13, color: colors.muted },
+  delta: { fontSize: 13 },
 });
