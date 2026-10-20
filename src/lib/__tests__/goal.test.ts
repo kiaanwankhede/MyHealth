@@ -222,3 +222,33 @@ describe('describeStatus', () => {
     );
   });
 });
+
+describe('starting a goal from the trend', () => {
+  // A month at 89.2, then 89.1, then a single lower weigh-in of 89.0 on the second day of the goal.
+  const goalDay = new Date(2026, 9, 19);
+  const today = new Date(2026, 9, 20);
+  const readings = [
+    ...Array.from({ length: 30 }, (_, i) => ({ kg: 89.2, time: addDays(goalDay, i - 30) })),
+    { kg: 89.1, time: goalDay },
+    { kg: 89.0, time: today },
+  ];
+  const series = trendSeries(dailyAverages(readings));
+  const trendToday = series[series.length - 1].trend;
+  const week = (startKg: number): Goal => ({
+    startDate: goalDay,
+    startKg,
+    targetKg: 88.8,
+    targetDate: addDays(goalDay, 7),
+  });
+
+  it('shows you behind plan on day one when the goal starts from a single low weigh-in', () => {
+    const progress = goalProgress(week(89.0), series, today)!;
+    expect(progress.behindKg).toBeGreaterThan(0.1);
+    expect(progress.behindDays).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is on plan on day one when the goal starts from the trend', () => {
+    const progress = goalProgress(week(Math.round(trendToday * 10) / 10), series, today)!;
+    expect(describeStatus(progress).text).toBe('Right on plan');
+  });
+});

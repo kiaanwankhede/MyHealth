@@ -5,13 +5,18 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { DateField, KgField } from '../components/FormFields';
 import { getCurrentGoal, saveGoal } from '../db/database';
-import { readLatestWeight } from '../health/healthConnect';
-import { addDays, formatDate, startOfLocalDay } from '../lib/dates';
+import { readWeightHistory } from '../health/healthConnect';
+import { addDays, calendarDaysBetween, formatDate, startOfLocalDay } from '../lib/dates';
 import { formatKg, parseDecimal } from '../lib/format';
-import { planGoal, validateGoal, type Goal } from '../lib/goal';
+import { dailyAverages, planGoal, trendSeries, validateGoal, type Goal, type TrendPoint } from '../lib/goal';
+import { trendOn } from '../lib/review';
 import { colors, radius } from '../theme';
 
 const DEFAULT_WEEKS = 16;
+/** Enough history for the trend to settle (it takes about a month) before today. */
+const TREND_HISTORY_DAYS = 180;
+/** A start weight this close to the trend counts as "the trend". */
+const SAME_KG = 0.05;
 
 export default function GoalScreen() {
   const db = useSQLiteContext();
@@ -23,8 +28,11 @@ export default function GoalScreen() {
   const [targetDate, setTargetDate] = useState(addDays(today, DEFAULT_WEEKS * 7));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [series, setSeries] = useState<TrendPoint[]>([]);
 
-  // Prefill from the current goal, or the latest weigh-in for a new goal.
+  // Prefill from the current goal. A new goal starts from your weight trend, because progress is
+  // measured from the trend: starting from a single weigh-in that differs from it would show you
+  // ahead or behind plan on day one.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -35,11 +43,15 @@ export default function GoalScreen() {
         setTargetKg(formatKg(existing.targetKg));
         setStartDate(existing.startDate);
         setTargetDate(existing.targetDate);
-        return;
       }
       try {
-        const latest = await readLatestWeight();
-        if (!cancelled && latest) setStartKg(formatKg(latest.kg));
+        const now = new Date();
+        const readings = await readWeightHistory(addDays(now, -TREND_HISTORY_DAYS), now);
+        if (cancelled) return;
+        const trend = trendSeries(dailyAverages(readings));
+        setSeries(trend);
+        const last = trend[trend.length - 1];
+        if (!existing && last) setStartKg(formatKg(last.trend));
       } catch {
         // No Health Connect access yet: the user types the start weight.
       }
@@ -48,6 +60,10 @@ export default function GoalScreen() {
       cancelled = true;
     };
   }, [db]);
+
+  const trendAtStart = trendOn(series, startDate);
+  const lastWeighIn = series.length ? series[series.length - 1].kg : null;
+  const startsToday = calendarDaysBetween(startDate, today) === 0;
 
   const goal: Goal = {
     startDate,
@@ -71,8 +87,30 @@ export default function GoalScreen() {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
       <KgField label="Start weight" value={startKg} onChangeText={setStartKg} />
+      {trendAtStart !== null && (
+        <View style={styles.hint}>
+          <Text style={styles.hintText}>
+            Your weight trend {startsToday ? 'today' : `on ${formatDate(startDate)}`} is{' '}
+            {formatKg(trendAtStart)} kg
+            {startsToday && lastWeighIn !== null
+              ? `; your latest weigh-in was ${formatKg(lastWeighIn)} kg`
+              : ''}
+            . Progress is measured from the trend, so starting from it keeps you from looking ahead or behind
+            plan on day one.
+          </Text>
+          {!(Math.abs(goal.startKg - trendAtStart) < SAME_KG) && (
+            <Pressable onPress={() => setStartKg(formatKg(trendAtStart))} accessibilityRole="button">
+              <Text style={styles.link}>Use {formatKg(trendAtStart)} kg</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       <DateField label="Start date" value={startDate} onChange={setStartDate} maximumDate={today} />
       <KgField label="Target weight" value={targetKg} onChangeText={setTargetKg} highlight />
       <DateField
@@ -127,6 +165,8 @@ export default function GoalScreen() {
 }
 
 const styles = StyleSheet.create({
+  hint: { backgroundColor: colors.tealSoft, borderRadius: radius.pill, padding: 12, gap: 6 },
+  hintText: { fontSize: 14, lineHeight: 20, color: colors.tealDark },
   screen: { flex: 1, backgroundColor: colors.surface },
   content: { padding: 20, gap: 16 },
   error: { fontSize: 15, color: colors.orangeDark },
@@ -138,7 +178,12 @@ const styles = StyleSheet.create({
   warnBox: { backgroundColor: colors.orangeSoft, borderRadius: 12, padding: 12, gap: 8, marginTop: 4 },
   warn: { fontSize: 15, lineHeight: 21, color: '#8A3A0E' },
   link: { fontSize: 15, fontWeight: '700', color: colors.teal },
-  button: { backgroundColor: colors.teal, borderRadius: radius.pill, paddingVertical: 16, alignItems: 'center' },
+  button: {
+    backgroundColor: colors.teal,
+    borderRadius: radius.pill,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: colors.surface, fontSize: 17, fontWeight: '600' },
   footnote: { fontSize: 13, lineHeight: 18, color: colors.muted },
