@@ -41,8 +41,13 @@ export type GoalPlan = {
   earliestSafeDate: Date;
 };
 
+/** Gaps smaller than this read as "on plan": the trend's day-to-day noise is about this size. */
+export const ON_PLAN_TOLERANCE_KG = 0.15;
+
 export type GoalProgress = {
   trendKg: number;
+  /** The latest day's weigh-in, before smoothing. */
+  scaleKg: number;
   planKg: number;
   lostKg: number;
   toGoKg: number;
@@ -57,6 +62,8 @@ export type GoalProgress = {
   /** When the goal is reached at the measured pace; null if not losing or no pace yet. */
   projectedFinish: Date | null;
   reached: boolean;
+  /** The latest weigh-in is at or below the target, though the slower trend hasn't caught up yet. */
+  reachedOnScale: boolean;
 };
 
 export function validateGoal(goal: Goal): string | null {
@@ -151,6 +158,7 @@ export function measuredPace(series: readonly TrendPoint[], since: Date): number
 export function goalProgress(goal: Goal, series: readonly TrendPoint[], today: Date): GoalProgress | null {
   if (series.length === 0) return null;
   const trendKg = series[series.length - 1].trend;
+  const scaleKg = series[series.length - 1].kg;
   const planKg = planWeightOn(goal, today);
   const kgToLose = goal.startKg - goal.targetKg;
   const lostKg = goal.startKg - trendKg;
@@ -169,6 +177,7 @@ export function goalProgress(goal: Goal, series: readonly TrendPoint[], today: D
 
   return {
     trendKg,
+    scaleKg,
     planKg,
     lostKg,
     toGoKg,
@@ -178,6 +187,7 @@ export function goalProgress(goal: Goal, series: readonly TrendPoint[], today: D
     paceKgPerWeek,
     projectedFinish,
     reached,
+    reachedOnScale: !reached && scaleKg <= goal.targetKg,
   };
 }
 
@@ -186,10 +196,12 @@ export type GoalStatus = { text: string; tone: 'good' | 'warn' };
 /** One-line status for the goal: reached, on plan, or how far ahead/behind (kg and days). */
 export function describeStatus(p: GoalProgress): GoalStatus {
   if (p.reached) return { text: 'Goal reached', tone: 'good' };
+  // The trend lags the scale, so a weigh-in at target is good news even while the trend says "behind".
+  if (p.reachedOnScale) return { text: 'Latest weigh-in is at your target', tone: 'good' };
   const kg = Math.abs(p.behindKg).toFixed(1);
   const days = Math.abs(p.behindDays);
   const dayText = days === 1 ? '1 day' : `${days} days`;
-  if (Math.abs(p.behindKg) < 0.05) return { text: 'Right on plan', tone: 'good' };
+  if (Math.abs(p.behindKg) < ON_PLAN_TOLERANCE_KG) return { text: 'Right on plan', tone: 'good' };
   if (p.behindKg > 0) return { text: `${kg} kg behind plan (${dayText})`, tone: 'warn' };
   return { text: `${kg} kg ahead of plan (${dayText})`, tone: 'good' };
 }

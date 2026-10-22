@@ -11,6 +11,7 @@ describe('buildSnapshot', () => {
       trendKg: 82.71,
       progress: {
         trendKg: 82.7,
+        scaleKg: 82.6,
         planKg: 82.5,
         lostKg: 3.3,
         toGoKg: 7.7,
@@ -20,6 +21,7 @@ describe('buildSnapshot', () => {
         paceKgPerWeek: 0.3,
         projectedFinish: null,
         reached: false,
+        reachedOnScale: false,
       },
       now,
     });

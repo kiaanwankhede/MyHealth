@@ -189,6 +189,7 @@ describe('goalProgress', () => {
 describe('describeStatus', () => {
   const base = {
     trendKg: 82.7,
+    scaleKg: 82.6,
     planKg: 82.5,
     lostKg: 3.3,
     toGoKg: 7.7,
@@ -198,6 +199,7 @@ describe('describeStatus', () => {
     paceKgPerWeek: 0.3,
     projectedFinish: null,
     reached: false,
+    reachedOnScale: false,
   };
 
   it('says how far behind, in kg and days', () => {
@@ -217,9 +219,41 @@ describe('describeStatus', () => {
   });
 
   it('uses the singular for one day', () => {
-    expect(describeStatus({ ...base, behindKg: 0.05, behindDays: 1 }).text).toBe(
-      '0.1 kg behind plan (1 day)',
+    expect(describeStatus({ ...base, behindKg: 0.2, behindDays: 1 }).text).toBe(
+      '0.2 kg behind plan (1 day)',
     );
+  });
+
+  it('treats gaps within the trend noise as on plan', () => {
+    expect(describeStatus({ ...base, behindKg: 0.1, behindDays: 2 }).text).toBe('Right on plan');
+  });
+
+  it('celebrates a weigh-in at target even when the trend is still behind', () => {
+    expect(describeStatus({ ...base, reachedOnScale: true })).toEqual({
+      text: 'Latest weigh-in is at your target',
+      tone: 'good',
+    });
+  });
+});
+
+describe('a fast small drop to the target', () => {
+  // Weight stays at 89.2 for a month, then 89.1, 89.0, 88.9, 88.8 over four days; goal 19 -> 26 Oct, target 88.8.
+  const goalDay = new Date(2026, 9, 19);
+  const today = new Date(2026, 9, 22);
+  const readings = [
+    ...Array.from({ length: 30 }, (_, i) => ({ kg: 89.2, time: addDays(goalDay, i - 30) })),
+    { kg: 89.1, time: goalDay },
+    { kg: 89.0, time: addDays(goalDay, 1) },
+    { kg: 88.9, time: addDays(goalDay, 2) },
+    { kg: 88.8, time: today },
+  ];
+  const series = trendSeries(dailyAverages(readings));
+
+  it.each([89.0, 89.1])('is not "behind" with a goal started at %s kg', (startKg) => {
+    const goal: Goal = { startDate: goalDay, startKg, targetKg: 88.8, targetDate: addDays(goalDay, 7) };
+    const status = describeStatus(goalProgress(goal, series, today)!);
+    expect(status.tone).toBe('good');
+    expect(status.text).not.toMatch(/behind/);
   });
 });
 
