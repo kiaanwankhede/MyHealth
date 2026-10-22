@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { describeRetro, type RetroGoal } from '../lib/steps';
 import { colors, radius } from '../theme';
@@ -17,6 +18,11 @@ export function RetroGoalCard({ retro }: { retro: RetroGoal }) {
         )}
       </View>
       <Text style={styles.body}>{describeRetro(retro)}</Text>
+      {covered > 0 && (
+        <Pressable onPress={() => router.push('/day-by-day')} accessibilityRole="button">
+          <Text style={styles.link}>See which days ›</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -37,4 +43,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   body: { fontSize: 15, lineHeight: 21, color: '#5A2A0B' },
+  link: { fontSize: 15, fontWeight: '700', color: colors.teal, paddingTop: 2 },
 });

@@ -6,6 +6,7 @@ import {
   stepStats,
   yearInsights,
   comparePeriods,
+  dayByDay,
   yearChange,
   type DailySteps,
 } from '../steps';
@@ -159,5 +160,41 @@ describe('yearChange', () => {
     expect(change.newBest).toBe(true);
     expect(change.longestStreak).toBe(7);
     expect(change.distanceKm).toBeCloseTo(distanceKm(7 * 12_000));
+  });
+});
+
+describe('dayByDay', () => {
+  const day = (i: number, steps: number): DailySteps => ({ date: new Date(2026, 9, 1 + i), steps });
+
+  it('lists newest first and marks the covered window', () => {
+    // oldest first: 3,000 / 14,000 / 8,000 / 12,000 (today). 12k + 8k + 14k = 34k ≥ 30k, + 3k = 37k < 40k.
+    const out = dayByDay([day(0, 3000), day(1, 14000), day(2, 8000), day(3, 12000)], GOAL);
+    expect(out.rows.map((r) => [r.steps, r.daysBack, r.covered])).toEqual([
+      [12000, 1, true],
+      [8000, 2, true],
+      [14000, 3, true],
+      [3000, 4, false],
+    ]);
+    expect(out.coveredDays).toBe(3);
+    expect(out.coveredSteps).toBe(34000);
+    expect(out.neededSteps).toBe(30000);
+    expect(out.next).toMatchObject({ stepsNeeded: 3000, row: { steps: 3000, daysBack: 4 } });
+  });
+
+  it('covers nothing until today reaches the goal', () => {
+    const out = dayByDay([day(0, 20000), day(1, 7000)], GOAL);
+    expect(out.coveredDays).toBe(0);
+    expect(out.rows.every((r) => !r.covered)).toBe(true);
+    expect(out.next).toBeNull();
+  });
+
+  it('has no next day when everything is covered', () => {
+    const out = dayByDay([day(0, 12000), day(1, 11000)], GOAL);
+    expect(out.coveredDays).toBe(2);
+    expect(out.next).toBeNull();
+  });
+
+  it('handles no data', () => {
+    expect(dayByDay([], GOAL)).toEqual({ rows: [], coveredDays: 0, coveredSteps: 0, neededSteps: 0, next: null });
   });
 });

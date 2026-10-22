@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -173,6 +174,14 @@ export default function StepsScreen() {
                   />
                 }
               />
+              <Pressable
+                style={styles.row}
+                onPress={() => router.push('/day-by-day')}
+                accessibilityRole="button"
+              >
+                <Text style={styles.muted}>Day by day · since 1 Jan</Text>
+                <Text style={styles.link}>{days.length} days ›</Text>
+              </Pressable>
             </View>
             <Text style={styles.note}>
               Average, goal days and best day count full days (today is still going) and are compared with the{' '}

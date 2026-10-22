@@ -119,7 +119,45 @@ export function describeRetro(r: RetroGoal): string {
   }
 }
 
-export type Streak = { days: number; end: Date | null };
+export type DayRow = {
+  date: Date;
+  steps: number;
+  /** 1 for today, 2 for yesterday, and so on. */
+  daysBack: number;
+  /** Part of the retro-goal window. */
+  covered: boolean;
+};
+
+export type DayByDay = {
+  /** Newest first: today, yesterday, … back to the first day we have. */
+  rows: DayRow[];
+  coveredDays: number;
+  coveredSteps: number;
+  /** goal × coveredDays */
+  neededSteps: number;
+  /** The first day the window doesn't reach, and how many more steps would cover it. */
+  next: { row: DayRow; stepsNeeded: number } | null;
+};
+
+/** `days` is oldest first and ends with today. Marks the days that make up the retro goal. */
+export function dayByDay(days: readonly DailySteps[], goal: number): DayByDay {
+  const newestFirst = [...days].reverse();
+  const retro = retroGoal(
+    newestFirst.map((d) => d.steps),
+    goal,
+  );
+  const coveredDays = retro.state === 'today' ? 0 : retro.coveredDays;
+  const rows = newestFirst.map((d, i) => ({ ...d, daysBack: i + 1, covered: i < coveredDays }));
+  return {
+    rows,
+    coveredDays,
+    coveredSteps: rows.slice(0, coveredDays).reduce((s, r) => s + r.steps, 0),
+    neededSteps: coveredDays * goal,
+    next: retro.state === 'extend' ? { row: rows[coveredDays], stepsNeeded: retro.stepsNeeded } : null,
+  };
+}
+
+export type Streak ={ days: number; end: Date | null };
 
 export type YearInsights = {
   /** First day with any steps; earlier days are treated as "no data", not as zero. */
