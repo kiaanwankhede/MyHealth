@@ -2,13 +2,11 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { DATABASE_NAME, getProfile, getValue, migrate, setValue } from '../db/database';
 import { getHealthConnectStatus, readDailySteps } from '../health/healthConnect';
+import { calendarDaysBetween } from '../lib/dates';
 import { retroGoal } from '../lib/steps';
 import { withSteps, type WidgetSnapshot } from './snapshot';
 
 const KEY = 'widget_snapshot';
-
-/** How far back the widget's retro goal looks when it refreshes on its own. */
-const WIDGET_RETRO_DAYS = 60;
 
 export async function loadSnapshot(db: SQLiteDatabase): Promise<WidgetSnapshot | null> {
   const raw = await getValue(db, KEY);
@@ -36,7 +34,8 @@ export async function refreshSnapshot(db: SQLiteDatabase): Promise<WidgetSnapsho
   try {
     if ((await getHealthConnectStatus()) !== 'ready') return saved;
     const now = new Date();
-    const days = await readDailySteps(WIDGET_RETRO_DAYS, now);
+    // Same span as the app (1 January to today), so the widget and the Steps tab agree.
+    const days = await readDailySteps(calendarDaysBetween(new Date(now.getFullYear(), 0, 1), now) + 1, now);
     const newestFirst = days.map((d) => d.steps).reverse();
     const { stepGoal } = await getProfile(db);
     const snapshot = withSteps(saved, newestFirst[0] ?? 0, stepGoal, retroGoal(newestFirst, stepGoal), now);
