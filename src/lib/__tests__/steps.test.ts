@@ -22,8 +22,8 @@ describe('retroGoal', () => {
   });
 
   it('once today is met, asks for today + yesterday combined', () => {
-    // 12,000 + 7,000 = 19,000 of 20,000
-    expect(retroGoal([12000, 7000, 15000], GOAL)).toEqual({
+    // 12,000 + 7,000 = 19,000 of 20,000; a longer window never catches up, so 1,000 more is the next step.
+    expect(retroGoal([12000, 7000, 2000], GOAL)).toEqual({
       state: 'extend',
       coveredDays: 1,
       nextDays: 2,
@@ -32,8 +32,8 @@ describe('retroGoal', () => {
   });
 
   it('keeps adding days while the combined total holds', () => {
-    // 2 days: 25,000 >= 20,000; 3 days: 30,000 >= 30,000; 4 days: 32,000 < 40,000
-    expect(retroGoal([15000, 10000, 5000, 2000, 50000], GOAL)).toEqual({
+    // 2 days: 25,000 >= 20,000; 3 days: 30,000 >= 30,000; 4 days: 32,000 < 40,000; 5 days: 34,000 < 50,000
+    expect(retroGoal([15000, 10000, 5000, 2000, 2000], GOAL)).toEqual({
       state: 'extend',
       coveredDays: 3,
       nextDays: 4,
@@ -41,9 +41,26 @@ describe('retroGoal', () => {
     });
   });
 
-  it('stops at the first window that falls short, even if a longer one would pass', () => {
-    // 2 days fails (11,000 + 0 < 20,000) although 3 days (41,000) would pass.
-    expect(retroGoal([11000, 0, 30000], GOAL)).toMatchObject({ state: 'extend', coveredDays: 1 });
+  it('lets a strong stretch further back make up for a weak patch in between', () => {
+    // 2 days fails (11,000 + 0 < 20,000), but 3 days (41,000) reaches 30,000.
+    expect(retroGoal([11000, 0, 30000], GOAL)).toEqual({ state: 'all', coveredDays: 3 });
+  });
+
+  it('is fully covered whenever the average reaches the goal', () => {
+    expect(retroGoal([9729, 15945, 17000, 4589, 3000, 400, 20000], 9700)).toEqual({
+      state: 'all',
+      coveredDays: 7,
+    });
+  });
+
+  it('aims for the cheapest longer window', () => {
+    // 1 day ok; 2 days short by 8,000; 3 by 18,000; 4 by 2,000 (cheapest); 5 by 12,000; 6 by 22,000.
+    expect(retroGoal([12000, 0, 0, 26000, 0, 0], GOAL)).toMatchObject({
+      state: 'extend',
+      coveredDays: 1,
+      nextDays: 4,
+      stepsNeeded: 2000,
+    });
   });
 
   it('reports when every day with data is covered', () => {

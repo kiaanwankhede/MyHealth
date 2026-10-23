@@ -106,7 +106,7 @@ export default function DayByDayScreen() {
               <Text style={styles.boundaryTitle}>Coverage stops here</Text>
               <Text style={styles.boundaryBody}>
                 {formatDayHeading(next.row.date)} had {formatCount(next.row.steps)} steps.{' '}
-                {formatCount(next.stepsNeeded)} more steps today would cover it.
+                {formatCount(next.stepsNeeded)} more steps today would cover {next.nextDays} days.
               </Text>
             </View>
           );

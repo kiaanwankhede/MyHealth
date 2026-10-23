@@ -67,9 +67,9 @@ export function yearChange(days: readonly DailySteps[], goal: number): YearChang
 }
 
 /**
- * Retro goal: once today's goal is met, keep extending the window backwards one day at a
- * time while the combined steps still reach goal × days. The first window that falls short
- * is the next target.
+ * Retro goal: once today's goal is met, the covered window is the longest run of recent days
+ * (counting back from today) whose combined steps reach goal × days. The next target is the
+ * cheapest longer window.
  */
 export type RetroGoal =
   /** Today's goal isn't met yet. */
@@ -92,18 +92,24 @@ export function retroGoal(newestFirst: readonly number[], goal: number): RetroGo
   const today = newestFirst[0] ?? 0;
   if (today < goal) return { state: 'today', stepsNeeded: goal - today };
 
+  // The window is the longest run of recent days whose total reaches goal × days, so a strong
+  // stretch further back can make up for a weak patch in between.
+  let sum = 0;
   let covered = 1;
-  let sum = today;
-  while (covered < newestFirst.length) {
-    const nextSum = sum + newestFirst[covered];
-    const needed = (covered + 1) * goal;
-    if (nextSum < needed) {
-      return { state: 'extend', coveredDays: covered, nextDays: covered + 1, stepsNeeded: needed - nextSum };
-    }
-    sum = nextSum;
-    covered += 1;
+  const deficits: number[] = [];
+  for (let days = 1; days <= newestFirst.length; days++) {
+    sum += newestFirst[days - 1];
+    deficits.push(days * goal - sum);
+    if (days * goal <= sum) covered = days;
   }
-  return { state: 'all', coveredDays: covered };
+  if (covered === newestFirst.length) return { state: 'all', coveredDays: covered };
+
+  // The cheapest longer window to reach next (the longest one if several cost the same).
+  let nextDays = covered + 1;
+  for (let days = covered + 2; days <= newestFirst.length; days++) {
+    if (deficits[days - 1] <= deficits[nextDays - 1]) nextDays = days;
+  }
+  return { state: 'extend', coveredDays: covered, nextDays, stepsNeeded: deficits[nextDays - 1] };
 }
 
 export function describeRetro(r: RetroGoal): string {
@@ -111,7 +117,7 @@ export function describeRetro(r: RetroGoal): string {
     case 'today':
       return `${formatCount(r.stepsNeeded)} steps to go for today’s goal.`;
     case 'extend':
-      if (r.coveredDays === 1) {
+      if (r.coveredDays === 1 && r.nextDays === 2) {
         return `Today’s goal done! ${formatCount(r.stepsNeeded)} more steps covers yesterday too.`;
       }
       return `Last ${r.coveredDays} days covered. ${formatCount(r.stepsNeeded)} more steps covers ${r.nextDays} days.`;
@@ -147,7 +153,7 @@ export type DayByDay = {
   /** goal × coveredDays */
   neededSteps: number;
   /** The first day the window doesn't reach, and how many more steps would cover it. */
-  next: { row: DayRow; stepsNeeded: number } | null;
+  next: { row: DayRow; nextDays: number; stepsNeeded: number } | null;
 };
 
 /** `days` is oldest first and ends with today. Marks the days that make up the retro goal. */
@@ -166,7 +172,10 @@ export function dayByDay(days: readonly DailySteps[], goal: number): DayByDay {
     startDate: rows.length ? rows[rows.length - 1].date : null,
     average: average(rows),
     neededSteps: coveredDays * goal,
-    next: retro.state === 'extend' ? { row: rows[coveredDays], stepsNeeded: retro.stepsNeeded } : null,
+    next:
+      retro.state === 'extend'
+        ? { row: rows[coveredDays], nextDays: retro.nextDays, stepsNeeded: retro.stepsNeeded }
+        : null,
   };
 }
 
