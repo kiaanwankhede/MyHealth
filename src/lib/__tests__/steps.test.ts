@@ -14,6 +14,10 @@ import {
 const GOAL = 10_000;
 
 describe('retroGoal', () => {
+  it('ignores the days before steps were first recorded', () => {
+    expect(retroGoal([12000, 11000, 0, 0, 0], GOAL)).toEqual({ state: 'all', coveredDays: 2 });
+  });
+
   it('asks for today first', () => {
     expect(retroGoal([7842, 20000], GOAL)).toEqual({ state: 'today', stepsNeeded: 2158 });
   });
@@ -195,6 +199,31 @@ describe('dayByDay', () => {
   });
 
   it('handles no data', () => {
-    expect(dayByDay([], GOAL)).toEqual({ rows: [], coveredDays: 0, coveredSteps: 0, neededSteps: 0, next: null });
+    expect(dayByDay([], GOAL)).toEqual({
+      rows: [],
+      coveredDays: 0,
+      coveredSteps: 0,
+      startDate: null,
+      average: null,
+      neededSteps: 0,
+      next: null,
+    });
+  });
+
+  it('starts at the first day with steps and ignores the zeros before it', () => {
+    // Nothing recorded before day 2; 3k, 12k, 14k (today). Padding zeros would otherwise be "covered".
+    const out = dayByDay([day(0, 0), day(1, 0), day(2, 3000), day(3, 12000), day(4, 14000)], GOAL);
+    expect(out.rows.map((r) => r.steps)).toEqual([14000, 12000, 3000]);
+    expect(out.startDate).toEqual(day(2, 0).date);
+    expect(out.coveredDays).toBe(2);
+    expect(out.next).toMatchObject({ stepsNeeded: 1000 });
+    // Average over completed days since the start: (12,000 + 3,000) / 2
+    expect(out.average).toBe(7500);
+  });
+
+  it('keeps real zero days after tracking started', () => {
+    const out = dayByDay([day(0, 9000), day(1, 0), day(2, 12000)], GOAL);
+    expect(out.rows).toHaveLength(3);
+    expect(out.average).toBe(4500);
   });
 });

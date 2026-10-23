@@ -86,8 +86,16 @@ export type RetroGoal =
   /** Every day we have data for is covered. */
   | { state: 'all'; coveredDays: number };
 
-/** `newestFirst[0]` is today, `[1]` yesterday, and so on. */
+/** Drops the oldest days with no steps: before you started counting there is nothing to cover. */
+function fromFirstSteps<T extends { steps: number }>(newestFirst: readonly T[]): T[] {
+  let end = newestFirst.length;
+  while (end > 1 && newestFirst[end - 1].steps === 0) end--;
+  return newestFirst.slice(0, end);
+}
+
+/** `newestFirst[0]` is today, `[1]` yesterday, and so on. Days before the first recorded steps are ignored. */
 export function retroGoal(newestFirst: readonly number[], goal: number): RetroGoal {
+  newestFirst = fromFirstSteps(newestFirst.map((steps) => ({ steps }))).map((d) => d.steps);
   const today = newestFirst[0] ?? 0;
   if (today < goal) return { state: 'today', stepsNeeded: goal - today };
 
@@ -128,11 +136,21 @@ export type DayRow = {
   covered: boolean;
 };
 
+function average(newestFirst: readonly DayRow[]): number | null {
+  if (newestFirst.length === 0) return null;
+  const complete = newestFirst.length > 1 ? newestFirst.slice(1) : newestFirst;
+  return Math.round(complete.reduce((s, r) => s + r.steps, 0) / complete.length);
+}
+
 export type DayByDay = {
   /** Newest first: today, yesterday, … back to the first day we have. */
   rows: DayRow[];
   coveredDays: number;
   coveredSteps: number;
+  /** First day with steps; earlier days are left out. Null without data. */
+  startDate: Date | null;
+  /** Steps per day since `startDate`, over completed days (today is still going). */
+  average: number | null;
   /** goal × coveredDays */
   neededSteps: number;
   /** The first day the window doesn't reach, and how many more steps would cover it. */
@@ -141,7 +159,7 @@ export type DayByDay = {
 
 /** `days` is oldest first and ends with today. Marks the days that make up the retro goal. */
 export function dayByDay(days: readonly DailySteps[], goal: number): DayByDay {
-  const newestFirst = [...days].reverse();
+  const newestFirst = fromFirstSteps([...days].reverse());
   const retro = retroGoal(
     newestFirst.map((d) => d.steps),
     goal,
@@ -152,6 +170,8 @@ export function dayByDay(days: readonly DailySteps[], goal: number): DayByDay {
     rows,
     coveredDays,
     coveredSteps: rows.slice(0, coveredDays).reduce((s, r) => s + r.steps, 0),
+    startDate: rows.length ? rows[rows.length - 1].date : null,
+    average: average(rows),
     neededSteps: coveredDays * goal,
     next: retro.state === 'extend' ? { row: rows[coveredDays], stepsNeeded: retro.stepsNeeded } : null,
   };

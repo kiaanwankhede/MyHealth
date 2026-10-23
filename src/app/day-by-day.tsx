@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 
 import { useProfile } from '../db/profile';
 import { useSteps } from '../health/useSteps';
-import { calendarDaysBetween, formatDayHeading, formatDayMonth } from '../lib/dates';
+import { calendarDaysBetween, formatDate, formatDayHeading, formatDayMonth } from '../lib/dates';
 import { formatCount } from '../lib/format';
 import { dayByDay, type DayRow } from '../lib/steps';
 import { colors, radius } from '../theme';
@@ -72,6 +72,11 @@ export default function DayByDayScreen() {
                     out.coveredDays
                   } × ${formatCount(stepGoal)}).`}
             </Text>
+            {out.startDate && out.average !== null && (
+              <Text style={styles.summaryBody}>
+                Average since you started on {formatDate(out.startDate)}: {formatCount(out.average)} steps a day.
+              </Text>
+            )}
           </View>
           {boundaryIndex > 0 && (
             <Pressable
@@ -90,7 +95,7 @@ export default function DayByDayScreen() {
       }
       ListFooterComponent={
         <Text style={styles.footer}>
-          Back to {formatDayMonth(first)} · {out.rows.length} days
+          Started {formatDayMonth(first)} · {out.rows.length} days
         </Text>
       }
       renderItem={({ item, index }) => {
