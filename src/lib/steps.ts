@@ -6,16 +6,9 @@ export type DailySteps = { date: Date; steps: number };
 
 /** Average adult stride, used for the distance estimate. */
 export const STRIDE_M = 0.762;
-/** ≈ kcal burned per step for a 70 kg adult; scaled by body weight when known. */
-export const KCAL_PER_STEP_70KG = 0.04;
 
 export function distanceKm(steps: number): number {
   return (steps * STRIDE_M) / 1000;
-}
-
-export function kcalFromSteps(steps: number, weightKg?: number | null): number {
-  const scale = weightKg ? weightKg / 70 : 1;
-  return steps * KCAL_PER_STEP_70KG * scale;
 }
 
 export type StepStats = { average: number; goalDays: number; best: DailySteps | null; total: number };

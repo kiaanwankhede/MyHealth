@@ -3,9 +3,6 @@
 
 import { addDays, calendarDaysBetween, startOfLocalDay } from './dates';
 
-/** ≈ energy in 1 kg of body fat. A standard estimate, shown to the user as a guide. */
-export const KCAL_PER_KG = 7700;
-
 /** Losing more than 1% of body weight per week is flagged as too fast. */
 export const MAX_SAFE_WEEKLY_FRACTION = 0.01;
 
@@ -34,7 +31,6 @@ export type GoalPlan = {
   totalDays: number;
   weeks: number;
   kgPerWeek: number;
-  kcalPerDay: number;
   maxSafeKgPerWeek: number;
   isSafe: boolean;
   /** Earliest target date that keeps the pace within the safe limit. */
@@ -89,7 +85,6 @@ export function planGoal(goal: Goal): GoalPlan {
     totalDays,
     weeks,
     kgPerWeek,
-    kcalPerDay: (kgToLose * KCAL_PER_KG) / totalDays,
     maxSafeKgPerWeek,
     // Small tolerance so a date picked from earliestSafeDate always passes.
     isSafe: kgPerWeek <= maxSafeKgPerWeek + 1e-9,

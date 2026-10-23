@@ -1,7 +1,6 @@
 import {
   describeRetro,
   distanceKm,
-  kcalFromSteps,
   retroGoal,
   stepStats,
   yearInsights,
@@ -89,10 +88,8 @@ describe('stepStats', () => {
 });
 
 describe('estimates', () => {
-  it('converts steps to distance and calories', () => {
+  it('converts steps to distance', () => {
     expect(distanceKm(7842)).toBeCloseTo(5.98, 2);
-    expect(Math.round(kcalFromSteps(7842))).toBe(314);
-    expect(Math.round(kcalFromSteps(7842, 84))).toBe(376);
   });
 });
 

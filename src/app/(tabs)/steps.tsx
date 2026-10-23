@@ -19,13 +19,11 @@ import { YearInsights } from '../../components/YearInsights';
 import { useProfile } from '../../db/profile';
 import { requestHealthConnectAccess } from '../../health/healthConnect';
 import { useSteps } from '../../health/useSteps';
-import { useWeightGoal } from '../../health/useWeightGoal';
 import { formatDayMonth } from '../../lib/dates';
 import { formatCount } from '../../lib/format';
 import {
   comparePeriods,
   distanceKm,
-  kcalFromSteps,
   retroGoal,
   yearChange,
   yearInsights,
@@ -36,7 +34,6 @@ type Range = 7 | 30;
 
 export default function StepsScreen() {
   const { status, days, fullAccess, yesterdaySoFar, error, reload } = useSteps();
-  const { latest } = useWeightGoal();
   const [range, setRange] = useState<Range>(7);
   const { stepGoal } = useProfile().profile;
 
@@ -44,7 +41,6 @@ export default function StepsScreen() {
   const shown = days.slice(-range);
   const { current: stats, previous } = comparePeriods(days, range, stepGoal);
   const vsYesterday = yesterdaySoFar === null || days.length < 2 ? null : today - yesterdaySoFar;
-  const weightKg = latest?.trend;
   const retro = retroGoal(
     [...days].reverse().map((d) => d.steps),
     stepGoal,
@@ -163,17 +159,6 @@ export default function StepsScreen() {
                   />
                 }
               />
-              <Row
-                label="Burned from steps"
-                value={`≈ ${formatCount(kcalFromSteps(today, weightKg))} kcal`}
-                delta={
-                  <Delta
-                    value={vsYesterday === null ? null : kcalFromSteps(vsYesterday, weightKg)}
-                    format={formatCount}
-                    better="up"
-                  />
-                }
-              />
               <Pressable
                 style={styles.row}
                 onPress={() => router.push('/day-by-day')}
@@ -185,8 +170,8 @@ export default function StepsScreen() {
             </View>
             <Text style={styles.note}>
               Average, goal days and best day count full days (today is still going) and are compared with the{' '}
-              {range} days before. Today’s numbers are compared with this time yesterday. Distance and
-              calories are estimates from your step count.
+              {range} days before. Today’s numbers are compared with this time yesterday. Distance is an
+              estimate from your step count.
             </Text>
 
             {year && (

@@ -129,7 +129,6 @@ export default function GoalScreen() {
             −{formatKg(plan.kgToLose)} kg · {plan.totalDays} days
           </Text>
           <Text style={styles.planLine}>{plan.kgPerWeek.toFixed(2)} kg per week</Text>
-          <Text style={styles.planLine}>≈ {Math.round(plan.kcalPerDay)} kcal/day below what you burn</Text>
           {plan.isSafe ? (
             <Text style={styles.safe}>✓ Safe pace (no more than 1% of body weight a week)</Text>
           ) : (
@@ -157,9 +156,7 @@ export default function GoalScreen() {
         <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save goal'}</Text>
       </Pressable>
 
-      <Text style={styles.footnote}>
-        The calorie figure assumes about 7,700 kcal per kg of body fat. It’s a guide, not medical advice.
-      </Text>
+      <Text style={styles.footnote}>This is a guide, not medical advice.</Text>
     </ScrollView>
   );
 }

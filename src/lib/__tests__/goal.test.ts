@@ -47,7 +47,6 @@ describe('planGoal', () => {
     expect(plan.totalDays).toBe(242);
     expect(plan.weeks).toBeCloseTo(34.57, 2);
     expect(plan.kgPerWeek).toBeCloseTo(0.318, 3);
-    expect(Math.round(plan.kcalPerDay)).toBe(350);
     expect(plan.maxSafeKgPerWeek).toBeCloseTo(0.86, 6);
     expect(plan.isSafe).toBe(true);
   });
