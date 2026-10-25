@@ -4,7 +4,11 @@
 const { withAppBuildGradle } = require('expo/config-plugins');
 
 const WORK_VERSION = '2.10.0';
-const LINE = `    implementation("androidx.work:work-runtime:${WORK_VERSION}")`;
+// work-runtime-ktx too: the steps notification's background task asks for an older ktx.
+const LINE = [
+  `    implementation("androidx.work:work-runtime:${WORK_VERSION}")`,
+  `    implementation("androidx.work:work-runtime-ktx:${WORK_VERSION}")`,
+].join('\n');
 
 module.exports = function withWorkManager(config) {
   return withAppBuildGradle(config, (c) => {

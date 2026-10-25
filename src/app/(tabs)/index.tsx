@@ -34,6 +34,7 @@ import { ageOn } from '../../lib/profile';
 import { detectPlateau, weeklyReview } from '../../lib/review';
 import { syncReminders } from '../../notifications/reminders';
 import { buildSnapshot } from '../../widget/snapshot';
+import { showStepsStatus } from '../../notifications/stepsStatus';
 import { updateWidget } from '../../widget/updateWidget';
 import { describeRetro, retroGoal } from '../../lib/steps';
 import { colors, radius, toneColors } from '../../theme';
@@ -89,6 +90,7 @@ export default function TodayScreen() {
         now: new Date(),
       }),
     ).catch(() => {});
+    showStepsStatus(db, steps, stepGoal, retro).catch(() => {});
     // widgetKey captures every value the widget shows.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [db, status, widgetKey]);

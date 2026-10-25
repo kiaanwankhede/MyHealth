@@ -9,3 +9,10 @@ try {
 } catch (e) {
   console.warn('Home-screen widget unavailable', e);
 }
+
+// Background refresh for the steps notification on the lock screen. Optional in the same way.
+try {
+  require('./src/notifications/stepsStatusTask');
+} catch (e) {
+  console.warn('Steps notification task unavailable', e);
+}

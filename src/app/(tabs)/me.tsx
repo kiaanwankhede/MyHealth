@@ -1,12 +1,15 @@
 import Constants from 'expo-constants';
 import { router, type Href } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProfile } from '../../db/profile';
 import { useWatchData } from '../../health/useWatchData';
 import { formatCount } from '../../lib/format';
 import { HEART_RISK_LABELS } from '../../lib/profile';
+import { isStepsStatusOn, setStepsStatusOn } from '../../notifications/stepsStatus';
 import { colors, radius } from '../../theme';
 
 export default function MeScreen() {
@@ -31,6 +34,7 @@ export default function MeScreen() {
           subtitle={`${details}\nStep goal ${formatCount(profile.stepGoal)} · Heart risk: ${HEART_RISK_LABELS[profile.heartRisk].toLowerCase()}`}
           href="/profile"
         />
+        <StepsStatusToggle />
         <Item
           title="Backup and export"
           subtitle="Save your data to Drive or Files, or restore it"
@@ -47,6 +51,50 @@ export default function MeScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function StepsStatusToggle() {
+  const db = useSQLiteContext();
+  const [on, setOn] = useState<boolean | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    isStepsStatusOn(db).then(setOn);
+  }, [db]);
+
+  const onChange = async (next: boolean) => {
+    setOn(next);
+    setNote(null);
+    try {
+      if (!(await setStepsStatusOn(db, next))) {
+        setOn(false);
+        setNote('Notifications are off for Sehat. Turn them on in Android settings, then try again.');
+      }
+    } catch (e) {
+      setOn(!next);
+      setNote(e instanceof Error ? e.message : 'Could not change the steps notification.');
+    }
+  };
+
+  return (
+    <View style={styles.item}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.itemTitle}>Steps on lock screen</Text>
+        <Text style={styles.itemSubtitle}>
+          A quiet notification with today’s steps and your retro goal. Updates about every 15 minutes, and
+          whenever you open Sehat.
+        </Text>
+        {note && <Text style={styles.note}>{note}</Text>}
+      </View>
+      <Switch
+        value={on ?? false}
+        disabled={on === null}
+        onValueChange={onChange}
+        trackColor={{ true: colors.teal, false: colors.border }}
+        accessibilityLabel="Steps on lock screen"
+      />
+    </View>
   );
 }
 
@@ -77,6 +125,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     padding: 16,
   },
+  note: { fontSize: 14, color: colors.orangeDark, marginTop: 6 },
   itemTitle: { fontSize: 17, fontWeight: '600', color: colors.ink },
   itemSubtitle: { fontSize: 14, lineHeight: 20, color: colors.muted, marginTop: 2 },
   chevron: { fontSize: 28, color: colors.inactive },

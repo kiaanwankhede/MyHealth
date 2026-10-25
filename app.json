@@ -62,6 +62,7 @@
           ]
         }
       ],
+      "expo-background-task",
       "./plugins/with-work-manager"
     ]
   }

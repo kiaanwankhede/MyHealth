@@ -3,18 +3,17 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getProfile, getReminderSettings, listLabReports, listMedicines } from '../db/database';
 import { retestDates } from '../lib/labs';
+import { STEPS_STATUS_ID } from '../lib/stepsStatus';
 import { planReminders, type PlannedReminder } from '../lib/reminders';
 
 const CHANNEL_ID = 'reminders';
 
-// Show reminders even when Sehat is open.
+// Show reminders even when Sehat is open. The steps notification updates quietly in the shade.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (n) => {
+    const quiet = n.request.identifier === STEPS_STATUS_ID;
+    return { shouldShowBanner: !quiet, shouldShowList: true, shouldPlaySound: !quiet, shouldSetBadge: false };
+  },
 });
 
 /** Asks for notification permission if needed. Resolves true when Sehat may notify. */
