@@ -28,7 +28,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Branch builds only read the Gradle cache unless told to write it, so without this every
+      # build downloaded and compiled everything from scratch.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Install dependencies
         run: npm ci
@@ -40,7 +44,7 @@ jobs:
 
       - name: Build the APK (x86_64, for the emulator)
         working-directory: android
-        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --stacktrace
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --build-cache --parallel -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" --stacktrace
 
       - name: Enable KVM
         run: |

@@ -31,7 +31,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Branch builds only read the Gradle cache unless told to write it, so without this every
+      # build downloaded and compiled everything from scratch.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       - name: Install dependencies
         run: npm ci
@@ -53,7 +57,7 @@ jobs:
       # 64-bit ARM only (every modern Android phone): cuts the native build roughly in four.
       - name: Build the APK
         working-directory: android
-        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --stacktrace
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a --build-cache --parallel -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g" --stacktrace
 
       - name: Name the APK
         run: cp android/app/build/outputs/apk/release/app-release.apk sehat.apk
